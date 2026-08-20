@@ -5,6 +5,7 @@ import { generateCertificatePdf } from '../services/pdf.service';
 import { storageService } from '../services/storage.service';
 import { emailService } from '../services/email.service';
 import { audit } from '../utils/auditLog';
+import { logger } from '../utils/logger';
 import { env } from '../config/env';
 import { str } from '../utils/param';
 import {
@@ -114,10 +115,18 @@ export const certificateController = {
       create: { organizationId: orgId, name: recipientName, email: recipientEmail },
     });
 
-    const { certId, verificationUrl, pdfUrl, qrUrl, certHash } = await buildCertificate(
-      orgId, recipient.id, { title, description, achievement, customMessage, issueDate, expiryDate, templateId },
-      req.user!.userId
-    );
+    let buildResult: Awaited<ReturnType<typeof buildCertificate>>;
+    try {
+      buildResult = await buildCertificate(
+        orgId, recipient.id, { title, description, achievement, customMessage, issueDate, expiryDate, templateId },
+        req.user!.userId
+      );
+    } catch (buildErr: any) {
+      logger.error('buildCertificate failed', { error: buildErr?.message, stack: buildErr?.stack, orgId });
+      return serverError(res, `Certificate generation failed: ${buildErr?.message}`);
+    }
+
+    const { certId, verificationUrl, pdfUrl, qrUrl, certHash } = buildResult;
 
     const cert = await prisma.certificate.create({
       data: {
@@ -145,14 +154,23 @@ export const certificateController = {
       ipAddress: req.ip,
     });
 
-    // Optional email
+    // Optional email — failure must not roll back an already-committed certificate
     if (sendEmail) {
-      const org = await prisma.organization.findUnique({ where: { id: orgId } });
-      await emailService.send(
-        emailService.certificateIssuedEmail(
-          recipientName, recipientEmail, certId, title, org?.name ?? 'CertiChain', verificationUrl
-        )
-      );
+      try {
+        const org = await prisma.organization.findUnique({ where: { id: orgId } });
+        await emailService.send(
+          emailService.certificateIssuedEmail(
+            recipientName, recipientEmail, certId, title, org?.name ?? 'CertiChain', verificationUrl
+          )
+        );
+      } catch (emailErr: any) {
+        // Log the failure but still return 201 — the certificate was issued successfully
+        logger.warn('Certificate issued but notification email failed', {
+          certId,
+          recipientEmail,
+          error: emailErr?.message,
+        });
+      }
     }
 
     return created(res, cert, `Certificate ${certId} issued successfully.`);
