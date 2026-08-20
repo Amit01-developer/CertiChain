@@ -1,0 +1,29 @@
+# Development Docker Compose — PostgreSQL only
+# Backend and Frontend run locally with hot reload
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   cd backend && npm run dev
+#   cd frontend && npm run dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: certichain_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: certichain
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: certichain
+    ports:
+      - '5433:5432'
+    volumes:
+      - certichain_postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U certichain -d certichain']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  certichain_postgres_dev_data:
