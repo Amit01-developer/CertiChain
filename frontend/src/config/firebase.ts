@@ -2,13 +2,13 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY    || '',
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY     || '',
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID  || 'htl-34e13',
-  storageBucket:     'htl-34e13.firebasestorage.app',
-  messagingSenderId: '507374991528',
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID  || 'certichain-3068f',
+  storageBucket:     'certichain-3068f.firebasestorage.app',
+  messagingSenderId: '507631200441',
   appId:             import.meta.env.VITE_FIREBASE_APP_ID      || '',
-  measurementId:     'G-K68NK5VPBV',
+  measurementId:     'G-ZF324F21QE',
 };
 
 // Prevent duplicate initialization (e.g. HMR in dev)
