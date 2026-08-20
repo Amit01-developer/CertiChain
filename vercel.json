@@ -1,0 +1,14 @@
+{
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "env": {
+    "VITE_FIREBASE_API_KEY": "AIzaSyB7TtQX5f_2KQWhiFdkkfkdhgUN2YeAaO0",
+    "VITE_FIREBASE_AUTH_DOMAIN": "htl-34e13.firebaseapp.com",
+    "VITE_FIREBASE_PROJECT_ID": "htl-34e13",
+    "VITE_FIREBASE_APP_ID": "1:507374991528:web:121bdcbacae609c1302a9d"
+  }
+}

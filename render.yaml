@@ -1,0 +1,76 @@
+services:
+  # ── Backend API ──────────────────────────────────────────────────────────────
+  - type: web
+    name: certichain-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: certichain-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        sync: false          # Set manually in Render dashboard after frontend deploys
+      - key: BACKEND_URL
+        sync: false          # Set manually to your Render backend URL
+      - key: STORAGE_PROVIDER
+        value: local
+      - key: STORAGE_LOCAL_DIR
+        value: ./uploads
+      - key: EMAIL_PROVIDER
+        value: log
+      - key: EMAIL_FROM
+        value: noreply@certichain.com
+      - key: EMAIL_FROM_NAME
+        value: CertiChain
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX
+        value: 100
+      - key: VERIFY_RATE_LIMIT_MAX
+        value: 30
+      - key: FIREBASE_PROJECT_ID
+        value: htl-34e13
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  - type: web
+    name: certichain-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    dockerBuildArgs:
+      - key: VITE_API_URL
+        sync: false          # Set to backend URL: https://certichain-backend.onrender.com/api
+      - key: VITE_APP_URL
+        sync: false          # Set to frontend URL: https://certichain-frontend.onrender.com
+      - key: VITE_FIREBASE_API_KEY
+        value: AIzaSyB7TtQX5f_2KQWhiFdkkfkdhgUN2YeAaO0
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        value: htl-34e13.firebaseapp.com
+      - key: VITE_FIREBASE_PROJECT_ID
+        value: htl-34e13
+      - key: VITE_FIREBASE_APP_ID
+        value: 1:507374991528:web:121bdcbacae609c1302a9d
+
+# ── PostgreSQL Database ───────────────────────────────────────────────────────
+databases:
+  - name: certichain-db
+    plan: free
+    databaseName: certichain
+    user: certichain
