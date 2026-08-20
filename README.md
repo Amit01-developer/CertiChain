@@ -22,27 +22,225 @@ CertiChain is a full-stack platform for issuing, managing, and verifying digital
 
 ---
 
+## Architecture
+
+CertiChain follows a classic **three-tier architecture** — a React SPA on the frontend, a REST API backend, and a PostgreSQL database — with pluggable adapters for storage and email.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          CLIENT (Browser)                           │
+│                                                                     │
+│   React 18 + Vite  ──  React Router v6  ──  Tailwind CSS           │
+│   React Hook Form  ──  Axios  ──  Firebase JS SDK (Google OAuth)    │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │  HTTPS / REST API (JSON)
+                             │  Authorization: Bearer <JWT>
+┌────────────────────────────▼────────────────────────────────────────┐
+│                        BACKEND (Node.js)                            │
+│                                                                     │
+│  Express 4 + TypeScript                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                 │
+│  │   Routes    │→ │ Controllers │→ │  Services   │                 │
+│  │  (7 files)  │  │  (7 files)  │  │ pdf/email/  │                 │
+│  └─────────────┘  └─────────────┘  │   storage   │                 │
+│                                    └──────┬──────┘                 │
+│  Middleware stack:                        │                         │
+│  Helmet → CORS → Rate Limit → Auth        │                         │
+│  → OrgRole → Validate → Controller        │                         │
+│                                           │                         │
+│  Prisma ORM ──────────────────────────────┘                         │
+└──────┬──────────────┬──────────────┬──────────────┬────────────────┘
+       │              │              │              │
+┌──────▼──────┐ ┌─────▼──────┐ ┌────▼──────┐ ┌────▼──────────┐
+│  PostgreSQL │ │ Cloudinary │ │  Firebase │ │  Email        │
+│  (Supabase) │ │  / S3 /    │ │  (Google  │ │  SMTP /       │
+│             │ │   Local    │ │   OAuth)  │ │  Resend / Log │
+└─────────────┘ └────────────┘ └───────────┘ └───────────────┘
+```
+
+### Request Lifecycle
+
+```
+Browser Request
+    │
+    ▼
+Helmet (security headers)
+    │
+    ▼
+CORS (allow frontend origin)
+    │
+    ▼
+Rate Limiter (global: 100/15min, verify: 30/15min)
+    │
+    ▼
+Morgan (request logging)
+    │
+    ▼
+Route Handler
+    │
+    ├── requireAuth         → verifies JWT, attaches req.user
+    ├── requireOrgRole      → checks OrgMember role, attaches req.orgId
+    ├── validate middleware → runs express-validator rules
+    │
+    ▼
+Controller (business logic)
+    │
+    ├── Prisma ORM  → PostgreSQL
+    ├── PDF Service → PDFKit → Storage Service → Cloudinary/S3/Local
+    ├── Email Service → SMTP/Resend/Log
+    │
+    ▼
+apiResponse helper (ok / created / badRequest / unauthorized / ...)
+    │
+    ▼
+JSON Response → Browser
+```
+
+### Certificate Issuance Pipeline
+
+```
+POST /api/organizations/:orgId/certificates
+    │
+    ▼
+Upsert Recipient (by org + email)
+    │
+    ▼
+generateCertificateId()  →  CC-2026-A8F92D71
+    │
+    ▼
+QR Code PNG buffer  ←  qrcode library
+    │
+    ▼
+generateCertificatePdf()  ←  PDFKit (A4 landscape, in-memory)
+    │
+    ▼
+storageService.upload() × 2  →  Cloudinary / S3 / Local
+  PDF URL + QR URL
+    │
+    ▼
+SHA-256 Hash  ←  certId + orgId + recipientId + title + issueDate
+    │
+    ▼
+prisma.certificate.create()  →  PostgreSQL
+    │
+    ▼
+emailService.send()  →  recipient notified (non-blocking)
+    │
+    ▼
+201 Created  →  { certificate, pdfUrl, qrCodeUrl }
+```
+
+### Authentication Architecture
+
+```
+                    ┌─────────────────────────────────┐
+                    │         Two Auth Paths           │
+                    └────────────┬────────────────────┘
+                                 │
+          ┌──────────────────────┴──────────────────────┐
+          │                                             │
+   Email / Password                            Google OAuth
+          │                                             │
+   bcrypt compare                          Firebase JS SDK
+   (cost factor: 12)                       signInWithPopup()
+          │                                             │
+          │                                    Firebase ID Token
+          │                                             │
+          │                             POST /api/auth/firebase
+          │                                             │
+          │                             Firebase Admin SDK
+          │                             verifyIdToken()
+          │                                             │
+          └──────────────────┬──────────────────────────┘
+                             │
+                    JWT signed (HS256)
+                    { userId, email, role }
+                    expires in 7d
+                             │
+                    stored in localStorage
+                    sent as: Authorization: Bearer <token>
+                             │
+                    requireAuth middleware
+                    verifies on every protected request
+```
+
+### Role-Based Access Control
+
+```
+Organization Roles (per org, not global):
+
+  OWNER  →  Full control: manage members, delete templates, all ADMIN actions
+    │
+  ADMIN  →  Issue bulk, revoke certs, edit org, upload logo, view analytics
+    │
+  STAFF  →  Issue single certs, view certs, view recipients, view templates
+
+Global Role (platform-wide):
+
+  SUPER_ADMIN  →  View all orgs, suspend/unsuspend organizations, view platform stats
+```
+
+---
+
 ## Tech Stack
 
-| Layer | Technology |
+### Frontend
+
+| Technology | Version | Purpose |
+|---|---|---|
+| React | 18 | UI library |
+| Vite | 5 | Build tool + dev server |
+| TypeScript | 5 | Type safety |
+| Tailwind CSS | 3 | Utility-first styling |
+| React Router | v6 | Client-side routing (lazy loaded pages) |
+| React Hook Form | 7 | Form state management |
+| Zod | 3 | Schema validation |
+| Axios | 1.7 | HTTP client with JWT interceptor |
+| Firebase JS SDK | 11 | Google OAuth popup flow |
+| Recharts | 2 | Charts (line, pie) for analytics |
+| react-hot-toast | 2 | Toast notifications |
+| Lucide React | 0.469 | Icon library |
+| qrcode | 1.5 | QR code rendering on verify page |
+
+### Backend
+
+| Technology | Version | Purpose |
+|---|---|---|
+| Node.js | 20+ | Runtime |
+| Express | 4 | HTTP framework |
+| TypeScript | 5 | Type safety |
+| tsx | 4 | TypeScript execution + hot reload in dev |
+| Prisma | 5 | ORM + migrations |
+| PostgreSQL | 16 | Primary database |
+| jsonwebtoken | 9 | JWT sign + verify |
+| bcryptjs | 2 | Password hashing (cost 12) |
+| Firebase Admin SDK | 13 | Google ID token verification |
+| PDFKit | 0.15 | Server-side PDF generation |
+| qrcode | 1.5 | QR code buffer generation |
+| cloudinary | 2 | Cloud storage (optional) |
+| Nodemailer | 6 | SMTP email sending (optional) |
+| Helmet | 8 | HTTP security headers |
+| express-rate-limit | 7 | Request rate limiting |
+| express-validator | 7 | Input validation |
+| cors | 2 | Cross-origin resource sharing |
+| morgan | 1 | HTTP request logging |
+| winston | 3 | Application logging |
+| multer | 1.4 | File upload handling (CSV, logo) |
+| csv-parse | 5 | CSV parsing for bulk issuance |
+| uuid | 10 | UUID generation |
+
+### Infrastructure & DevOps
+
+| Technology | Purpose |
 |---|---|
-| **Frontend** | React 18, Vite 5, TypeScript, Tailwind CSS 3 |
-| **State & Forms** | React Hook Form, Zod, React Router v6 |
-| **Charts** | Recharts |
-| **HTTP Client** | Axios (with JWT interceptor) |
-| **Auth (frontend)** | Firebase JS SDK (Google OAuth popup) |
-| **Backend** | Node.js, Express 4, TypeScript |
-| **ORM** | Prisma 5 |
-| **Database** | PostgreSQL 16 |
-| **Auth (backend)** | JWT (jsonwebtoken) + bcryptjs, Firebase Admin SDK |
-| **PDF Generation** | PDFKit (server-side, A4 landscape) |
-| **QR Codes** | `qrcode` library |
-| **Email** | Nodemailer (SMTP) / Resend / console log |
-| **Storage** | Local / AWS S3 / Cloudinary |
-| **Security** | Helmet, express-rate-limit, CORS |
-| **Testing** | Vitest + Supertest |
-| **Containers** | Docker + Docker Compose |
-| **API Docs** | Swagger UI |
+| Docker | Containerization |
+| Docker Compose | Multi-container orchestration |
+| Supabase | Managed PostgreSQL (production) |
+| Cloudinary | Media storage (PDFs, QR codes, logos) |
+| GitHub Actions | CI pipeline (`.github/workflows/ci.yml`) |
+| Swagger UI | Interactive API documentation at `/api/docs` |
+| Vitest | Unit + integration testing |
+| Supertest | HTTP endpoint testing |
 
 ---
 
