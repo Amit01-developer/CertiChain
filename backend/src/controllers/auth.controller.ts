@@ -6,6 +6,7 @@ import prisma from '../config/prisma';
 import { env } from '../config/env';
 import { emailService } from '../services/email.service';
 import { audit } from '../utils/auditLog';
+import admin from '../config/firebase';
 import {
   ok, created, badRequest, unauthorized, conflict, notFound, serverError
 } from '../utils/apiResponse';
@@ -60,6 +61,8 @@ export const authController = {
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return unauthorized(res, 'Invalid email or password.');
+
+    if (!user.passwordHash) return unauthorized(res, 'This account uses Google sign-in. Please use "Sign in with Google".');
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return unauthorized(res, 'Invalid email or password.');
@@ -168,7 +171,7 @@ export const authController = {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) return notFound(res, 'User not found.');
 
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash ?? '');
     if (!valid) return unauthorized(res, 'Current password is incorrect.');
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
@@ -179,5 +182,85 @@ export const authController = {
 
     await audit({ userId: user.id, action: 'PASSWORD_CHANGED', ipAddress: req.ip });
     return ok(res, null, 'Password updated successfully.');
+  },
+
+  // ── Firebase Google Sign-In ─────────────────────────────────────────────────
+  async firebaseLogin(req: Request, res: Response) {
+    const { idToken } = req.body;
+    if (!idToken) return badRequest(res, 'Firebase ID token is required.');
+
+    let decoded: admin.auth.DecodedIdToken;
+    try {
+      decoded = await admin.auth().verifyIdToken(idToken);
+    } catch {
+      return unauthorized(res, 'Invalid or expired Firebase token.');
+    }
+
+    const { uid, email, name, picture } = decoded;
+    if (!email) return badRequest(res, 'No email found in Google account.');
+
+    // Find or create user
+    let user = await prisma.user.findFirst({
+      where: { oauthProvider: 'google', oauthId: uid },
+    });
+
+    if (!user) {
+      // Try to link by email (existing email/password account)
+      user = await prisma.user.findUnique({ where: { email } }) ?? null;
+
+      if (user) {
+        // Link Google to existing account
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data:  { oauthProvider: 'google', oauthId: uid, avatarUrl: picture ?? null, emailVerified: true },
+        });
+      } else {
+        // Create brand-new user
+        user = await prisma.user.create({
+          data: {
+            name:          name ?? email.split('@')[0],
+            email,
+            oauthProvider: 'google',
+            oauthId:       uid,
+            avatarUrl:     picture ?? null,
+            emailVerified: true,
+            passwordHash:  null,
+          },
+        });
+
+        // Auto-create a default org for them
+        await prisma.organization.create({
+          data: {
+            name:    `${user.name}'s Organization`,
+            type:    'Other',
+            email,
+            members: { create: { userId: user.id, role: 'OWNER' } },
+          },
+        });
+      }
+    }
+
+    // Fetch first org membership
+    const membership = await prisma.orgMember.findFirst({
+      where:   { userId: user.id },
+      include: { organization: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const token = signToken(user.id, user.email, user.role);
+    await audit({ userId: user.id, organizationId: membership?.organizationId, action: 'USER_LOGIN_GOOGLE', ipAddress: req.ip });
+
+    return ok(res, {
+      token,
+      user: {
+        id:            user.id,
+        name:          user.name,
+        email:         user.email,
+        emailVerified: user.emailVerified,
+        role:          user.role,
+        avatarUrl:     user.avatarUrl,
+      },
+      organization: membership?.organization ?? null,
+    }, 'Login successful.');
   },
 };

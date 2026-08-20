@@ -46,6 +46,15 @@ export const env = {
   RATE_LIMIT_MAX:        parseInt(optional('RATE_LIMIT_MAX', '100'), 10),
   VERIFY_RATE_LIMIT_MAX: parseInt(optional('VERIFY_RATE_LIMIT_MAX', '30'), 10),
 
+  // Google OAuth
+  GOOGLE_CLIENT_ID:     optional('GOOGLE_CLIENT_ID'),
+  GOOGLE_CLIENT_SECRET: optional('GOOGLE_CLIENT_SECRET'),
+
+  // Firebase Admin (for verifying frontend ID tokens)
+  FIREBASE_PROJECT_ID:   optional('FIREBASE_PROJECT_ID'),
+  FIREBASE_CLIENT_EMAIL: optional('FIREBASE_CLIENT_EMAIL'),
+  FIREBASE_PRIVATE_KEY:  optional('FIREBASE_PRIVATE_KEY'),
+
   get isDev()  { return this.NODE_ENV === 'development'; },
   get isProd() { return this.NODE_ENV === 'production'; },
 };

@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../config/firebase';
 import api from '../services/api';
 import type { User, Organization } from '../types';
 
@@ -10,10 +12,12 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login:      (email: string, password: string) => Promise<void>;
-  logout:     () => void;
-  setOrg:     (org: Organization) => void;
-  refreshMe:  () => Promise<void>;
+  login:              (email: string, password: string) => Promise<void>;
+  loginWithToken:     (token: string) => Promise<void>;
+  loginWithFirebase:  () => Promise<void>;
+  logout:             () => void;
+  setOrg:             (org: Organization) => void;
+  refreshMe:          () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -52,6 +56,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState({ user, organization, token, loading: false });
   }
 
+  async function loginWithToken(token: string) {
+    localStorage.setItem('cc_token', token);
+    setState(s => ({ ...s, token, loading: true }));
+    await refreshMe();
+  }
+
+  async function loginWithFirebase() {
+    // Opens Google popup — Firebase handles the OAuth flow
+    const result   = await signInWithPopup(auth, googleProvider);
+    const idToken  = await result.user.getIdToken();
+
+    // Send ID token to our backend to verify and get a CertiChain JWT
+    const res = await api.post('/auth/firebase', { idToken });
+    const { token, user, organization } = res.data.data;
+    localStorage.setItem('cc_token', token);
+    setState({ user, organization, token, loading: false });
+  }
+
   function logout() {
     localStorage.removeItem('cc_token');
     setState({ user: null, organization: null, token: null, loading: false });
@@ -62,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, setOrg, refreshMe }}>
+    <AuthContext.Provider value={{ ...state, login, loginWithToken, loginWithFirebase, logout, setOrg, refreshMe }}>
       {children}
     </AuthContext.Provider>
   );

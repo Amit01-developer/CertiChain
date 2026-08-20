@@ -53,4 +53,11 @@ router.put('/me/password',
   authController.changePassword
 );
 
+// Firebase Google login — receives a Firebase ID token from the frontend
+router.post('/firebase',
+  body('idToken').notEmpty().withMessage('Firebase ID token is required.'),
+  validate,
+  authController.firebaseLogin
+);
+
 export default router;
