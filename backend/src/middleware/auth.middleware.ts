@@ -5,7 +5,6 @@ import { unauthorized, forbidden } from '../utils/apiResponse';
 import prisma from '../config/prisma';
 import { OrgMemberRole } from '@prisma/client';
 
-// Re-export so other modules can use it without depending on @prisma/client directly
 export type { OrgMemberRole };
 
 export interface AuthPayload {
@@ -24,7 +23,6 @@ declare global {
   }
 }
 
-/** Verify JWT and attach user to request */
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   const token  = header?.startsWith('Bearer ') ? header.slice(7) : null;
@@ -40,7 +38,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-/** Require verified email */
 export async function requireVerifiedEmail(req: Request, res: Response, next: NextFunction) {
   if (!req.user) return unauthorized(res);
   const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
@@ -50,16 +47,11 @@ export async function requireVerifiedEmail(req: Request, res: Response, next: Ne
   next();
 }
 
-/** Require SUPER_ADMIN role */
 export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.user?.role !== 'SUPER_ADMIN') return forbidden(res, 'Super admin access required.');
   next();
 }
 
-/**
- * Factory: require user to be an org member with minimum role.
- * Attaches req.orgRole and req.orgId.
- */
 export function requireOrgRole(...minRoles: OrgMemberRole[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const orgId = Array.isArray(req.params.orgId) ? req.params.orgId[0] : (req.params.orgId ?? req.body.organizationId ?? req.query.orgId as string);
@@ -72,7 +64,6 @@ export function requireOrgRole(...minRoles: OrgMemberRole[]) {
 
     if (!member) return forbidden(res, 'You are not a member of this organization.');
 
-    // Role hierarchy: OWNER > ADMIN > STAFF
     const hierarchy: OrgMemberRole[] = ['STAFF', 'ADMIN', 'OWNER'];
     const memberLevel = hierarchy.indexOf(member.role);
     const minLevel    = Math.min(...minRoles.map(r => hierarchy.indexOf(r)));

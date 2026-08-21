@@ -70,10 +70,8 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-brand-cream">
-      {/* Desktop sidebar */}
       <div className="hidden md:flex flex-col"><Sidebar /></div>
 
-      {/* Mobile sidebar */}
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="flex flex-col"><Sidebar /></div>
@@ -81,7 +79,6 @@ export default function DashboardLayout() {
         </div>
       )}
 
-      {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-14 border-b border-brand-border bg-white flex items-center px-5 gap-4">
           <button className="md:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar">

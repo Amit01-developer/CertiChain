@@ -11,7 +11,6 @@ const firebaseConfig = {
   measurementId:     'G-ZF324F21QE',
 };
 
-// Prevent duplicate initialization (e.g. HMR in dev)
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 export const auth           = getAuth(app);

@@ -52,7 +52,6 @@ export default function OrgProfile() {
     <div className="max-w-2xl mx-auto">
       <h1 className="font-serif text-3xl text-brand-dark mb-8">Organization Profile</h1>
 
-      {/* Logo */}
       <div className="card mb-6 flex items-center gap-5">
         <div className="w-20 h-20 bg-brand-cream rounded-full flex items-center justify-center overflow-hidden border border-brand-border shrink-0">
           {organization?.logoUrl

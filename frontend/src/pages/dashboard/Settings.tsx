@@ -26,7 +26,6 @@ export default function Settings() {
   const orgId = organization?.id ?? '';
   const [addOpen, setAddOpen] = useState(false);
 
-  // ── Password form ────────────────────────────────────────────────────
   const pwForm = useForm<PwForm>({ resolver: zodResolver(pwSchema) });
   async function onPwSubmit(data: PwForm) {
     try {
@@ -38,7 +37,6 @@ export default function Settings() {
     }
   }
 
-  // ── Add member form ──────────────────────────────────────────────────
   const memberForm = useForm<MemberForm>({ resolver: zodResolver(memberSchema), defaultValues: { role: 'STAFF' } });
   async function onAddMember(data: MemberForm) {
     try {
@@ -63,7 +61,6 @@ export default function Settings() {
     <div className="max-w-2xl mx-auto space-y-8">
       <h1 className="font-serif text-3xl text-brand-dark">Settings</h1>
 
-      {/* ── Change Password ─────────────────────────────────────────────── */}
       <div className="card">
         <h2 className="font-serif text-xl text-brand-dark mb-5">Change Password</h2>
         <form onSubmit={pwForm.handleSubmit(onPwSubmit)} className="space-y-4">
@@ -96,7 +93,6 @@ export default function Settings() {
         </form>
       </div>
 
-      {/* ── Organization Members ─────────────────────────────────────────── */}
       <div className="card">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-serif text-xl text-brand-dark">Organization Members</h2>
@@ -133,7 +129,6 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Add Member Modal */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Member">
         <form onSubmit={memberForm.handleSubmit(onAddMember)} className="space-y-4">
           <div>

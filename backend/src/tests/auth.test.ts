@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import app from '../app';
 
-// Mock Prisma to avoid needing a real DB in unit tests
 vi.mock('../config/prisma', () => {
   const users = new Map<string, any>();
 

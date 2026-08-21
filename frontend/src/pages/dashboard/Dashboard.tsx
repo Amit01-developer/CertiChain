@@ -50,7 +50,6 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* Stats */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {statCards.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="card flex items-center gap-4">
@@ -65,7 +64,6 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Recent Certificates */}
       <div className="card">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-serif text-xl text-brand-dark">Recent Certificates</h2>

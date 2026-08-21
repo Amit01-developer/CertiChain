@@ -41,7 +41,6 @@ export default function Analytics() {
     { name: 'Expired', value: Math.max(0, data.total - data.active - data.revoked) },
   ].filter(d => d.value > 0);
 
-  // trend is now pre-aggregated by the backend: [{ month, count }]
   const trendData: { month: string; count: number }[] = data.trend ?? [];
 
   return (
@@ -63,7 +62,6 @@ export default function Analytics() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Bar chart */}
         <div className="card">
           <h2 className="font-serif text-lg text-brand-dark mb-6">Certificates Issued Over Time</h2>
           {trendData.length === 0 ? (
@@ -80,7 +78,6 @@ export default function Analytics() {
           )}
         </div>
 
-        {/* Pie chart */}
         <div className="card">
           <h2 className="font-serif text-lg text-brand-dark mb-6">Certificate Status Distribution</h2>
           {pieData.length === 0 ? (

@@ -25,7 +25,6 @@ type Form = z.infer<typeof schema>;
 
 const orgTypes = ['University', 'School', 'College', 'Company', 'NGO', 'Training Institute', 'Event Organizer', 'Other'];
 
-// Google "G" SVG icon
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -81,7 +80,6 @@ export default function Register() {
         </div>
 
         <div className="card">
-          {/* Google Sign-Up */}
           <button
             type="button"
             onClick={handleGoogleSignUp}
@@ -92,7 +90,6 @@ export default function Register() {
             {googleLoading ? 'Signing up…' : 'Continue with Google'}
           </button>
 
-          {/* Divider */}
           <div className="flex items-center gap-3 my-5">
             <hr className="flex-1 border-brand-border" />
             <span className="text-xs text-gray-400 uppercase tracking-wide">or register with email</span>

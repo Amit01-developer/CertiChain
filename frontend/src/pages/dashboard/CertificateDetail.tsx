@@ -67,7 +67,6 @@ export default function CertificateDetail() {
         <Badge status={cert.status} />
       </div>
 
-      {/* Details */}
       <div className="card mb-5">
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5">
           {([
@@ -94,7 +93,6 @@ export default function CertificateDetail() {
         )}
       </div>
 
-      {/* Actions + QR */}
       <div className="card mb-5">
         <div className="flex flex-col sm:flex-row gap-6 items-start">
           {qrSrc && (
@@ -124,7 +122,6 @@ export default function CertificateDetail() {
         </div>
       </div>
 
-      {/* Revoke Modal */}
       <Modal open={revokeOpen} onClose={() => setRevokeOpen(false)} title="Revoke Certificate">
         <div className="space-y-4">
           <p className="text-sm text-gray-600">

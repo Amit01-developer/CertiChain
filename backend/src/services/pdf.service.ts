@@ -22,15 +22,10 @@ export interface CertificateData {
   };
 }
 
-/**
- * Generates a professional PDF certificate using PDFKit.
- * Returns a Buffer containing the PDF bytes.
- */
 export async function generateCertificatePdf(data: CertificateData): Promise<Buffer> {
   const primaryColor = data.template?.primaryColor ?? '#112a29';
   const accentColor  = data.template?.accentColor  ?? '#ddf05c';
 
-  // Generate QR code as data URL
   const qrDataUrl = await QRCode.toDataURL(data.verificationUrl, {
     width: 100,
     margin: 1,
@@ -54,33 +49,25 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
     const W = doc.page.width;
     const H = doc.page.height;
 
-    // ── Background ─────────────────────────────────────────────────────────
     doc.rect(0, 0, W, H).fill('#f7f4ed');
 
-    // Left dark sidebar
     doc.rect(0, 0, 28, H).fill(primaryColor);
-    // Right dark sidebar
     doc.rect(W - 28, 0, 28, H).fill(primaryColor);
 
-    // Top accent bar
     doc.rect(28, 0, W - 56, 8).fill(accentColor);
-    // Bottom accent bar
     doc.rect(28, H - 8, W - 56, 8).fill(accentColor);
 
-    // Inner border
     doc
       .rect(40, 20, W - 80, H - 40)
       .lineWidth(1.5)
       .stroke('#c9c1af');
 
-    // ── Header ─────────────────────────────────────────────────────────────
     doc
       .font('Helvetica-Bold')
       .fontSize(9)
       .fillColor('#637472')
       .text('OFFICIAL ACADEMIC CERTIFICATE', 0, 44, { align: 'center', characterSpacing: 2 });
 
-    // Decorative checkmark badge
     doc
       .circle(W / 2, 85, 18)
       .fillAndStroke(primaryColor, primaryColor);
@@ -90,21 +77,18 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
       .fillColor(accentColor)
       .text('✓', W / 2 - 6, 78);
 
-    // ── Title ──────────────────────────────────────────────────────────────
     doc
       .font('Helvetica-Bold')
       .fontSize(26)
       .fillColor(primaryColor)
       .text(data.title, 60, 120, { align: 'center', width: W - 120 });
 
-    // Divider
     doc
       .moveTo(W / 2 - 80, 168)
       .lineTo(W / 2 + 80, 168)
       .lineWidth(1)
       .stroke('#c9c1af');
 
-    // ── Recipient ──────────────────────────────────────────────────────────
     doc
       .font('Helvetica')
       .fontSize(11)
@@ -117,7 +101,6 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
       .fillColor(primaryColor)
       .text(data.recipientName, 60, 200, { align: 'center', width: W - 120 });
 
-    // Achievement
     if (data.achievement) {
       doc
         .font('Helvetica')
@@ -132,7 +115,6 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
         .text(data.achievement, 60, 268, { align: 'center', width: W - 120 });
     }
 
-    // Custom message
     if (data.customMessage) {
       doc
         .font('Helvetica')
@@ -141,7 +123,6 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
         .text(data.customMessage, 80, 302, { align: 'center', width: W - 160 });
     }
 
-    // ── Footer info ────────────────────────────────────────────────────────
     const footerY = H - 95;
 
     doc
@@ -150,7 +131,6 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
       .lineWidth(0.5)
       .stroke('#d9d4c8');
 
-    // Issue date
     const dateStr = data.issueDate.toLocaleDateString('en-GB', {
       day: '2-digit', month: 'long', year: 'numeric',
     });
@@ -160,27 +140,23 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
     doc.font('Helvetica-Bold').fontSize(10).fillColor(primaryColor)
        .text(dateStr, 70, footerY + 12);
 
-    // Issued by
     doc.font('Helvetica').fontSize(9).fillColor('#637472')
        .text('ISSUED BY', W / 2 - 50, footerY, { align: 'center', width: 100 });
     doc.font('Helvetica-Bold').fontSize(10).fillColor(primaryColor)
        .text(data.organizationName, W / 2 - 80, footerY + 12, { align: 'center', width: 160 });
 
-    // Certificate ID
     doc.font('Helvetica').fontSize(9).fillColor('#637472')
        .text('CERTIFICATE ID', W - 220, footerY);
     doc.font('Helvetica-Bold').fontSize(9)
        .fillColor('#167862')
        .text(data.certificateId, W - 220, footerY + 12);
 
-    // QR code
     if (data.template?.showQR !== false) {
       doc.image(qrBuffer, W - 115, H - 120, { width: 72, height: 72 });
       doc.font('Helvetica').fontSize(6).fillColor('#637472')
          .text('Scan to verify', W - 115, H - 44, { width: 72, align: 'center' });
     }
 
-    // Expiry date if present
     if (data.expiryDate) {
       const expStr = data.expiryDate.toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric',
@@ -189,7 +165,6 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
          .text(`Valid until: ${expStr}`, 70, footerY + 28);
     }
 
-    // CertiChain branding
     doc.font('Helvetica').fontSize(7).fillColor('#aeb9b1')
        .text('Verified by CertiChain — certichain.app', 0, H - 18, { align: 'center' });
 

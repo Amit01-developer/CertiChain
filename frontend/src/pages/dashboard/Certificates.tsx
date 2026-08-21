@@ -58,7 +58,6 @@ export default function Certificates() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <form onSubmit={handleSearch} className="flex gap-2 flex-1">
           <div className="relative flex-1">

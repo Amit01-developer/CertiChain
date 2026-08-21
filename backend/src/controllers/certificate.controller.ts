@@ -19,20 +19,17 @@ async function buildCertificate(orgId: string, recipientId: string, data: any, u
   const certId = generateCertificateId();
   const verificationUrl = `${env.FRONTEND_URL}/verify/${certId}`;
 
-  // Generate QR code
   const qrBuffer = Buffer.from(
     (await QRCode.toDataURL(verificationUrl, { width: 200, margin: 1 })).split(',')[1],
     'base64'
   );
 
-  // Get org + recipient + template info for PDF
   const [org, recipient, template] = await Promise.all([
     prisma.organization.findUnique({ where: { id: orgId } }),
     prisma.recipient.findUnique({ where: { id: recipientId } }),
     data.templateId ? prisma.certificateTemplate.findUnique({ where: { id: data.templateId } }) : Promise.resolve(null),
   ]);
 
-  // Generate PDF
   const pdfBuffer = await generateCertificatePdf({
     certificateId:    certId,
     recipientName:    recipient?.name ?? data.recipientName,
@@ -47,13 +44,11 @@ async function buildCertificate(orgId: string, recipientId: string, data: any, u
     template:         template?.configuration as any,
   });
 
-  // Upload PDF and QR
   const [pdfResult, qrResult] = await Promise.all([
     storageService.upload(pdfBuffer, `cert-${certId}.pdf`, 'application/pdf'),
     storageService.upload(qrBuffer,  `qr-${certId}.png`,  'image/png'),
   ]);
 
-  // Compute integrity hash
   const certHash = await hashCertificateData({
     certificateId: certId,
     organizationId: orgId,
@@ -108,7 +103,6 @@ export const certificateController = {
       customMessage, issueDate, expiryDate, templateId, sendEmail,
     } = req.body;
 
-    // Upsert recipient
     const recipient = await prisma.recipient.upsert({
       where:  { organizationId_email: { organizationId: orgId, email: recipientEmail } },
       update: { name: recipientName },
@@ -154,7 +148,6 @@ export const certificateController = {
       ipAddress: req.ip,
     });
 
-    // Optional email — failure must not roll back an already-committed certificate
     if (sendEmail) {
       try {
         const org = await prisma.organization.findUnique({ where: { id: orgId } });
@@ -164,7 +157,6 @@ export const certificateController = {
           )
         );
       } catch (emailErr: any) {
-        // Log the failure but still return 201 — the certificate was issued successfully
         logger.warn('Certificate issued but notification email failed', {
           certId,
           recipientEmail,

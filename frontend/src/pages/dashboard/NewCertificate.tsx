@@ -9,7 +9,6 @@ import toast from 'react-hot-toast';
 import { CheckCircle, Upload } from 'lucide-react';
 import type { Template } from '../../types';
 
-// ── Single certificate schema ──────────────────────────────────────────────
 const singleSchema = z.object({
   recipientName:  z.string().min(1, 'Required'),
   recipientEmail: z.string().email('Valid email required'),
@@ -33,7 +32,6 @@ export default function NewCertificate({ bulk = false }: Props) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [issued, setIssued] = useState<{ certificateId: string; id: string } | null>(null);
 
-  // Bulk state
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResults, setBulkResults] = useState<{ issued: any[]; errors: string[] } | null>(null);
@@ -42,7 +40,6 @@ export default function NewCertificate({ bulk = false }: Props) {
     if (orgId) api.get(`/organizations/${orgId}/templates`).then(r => setTemplates(r.data.data ?? [])).catch(() => {});
   }, [orgId]);
 
-  // ── Single form ────────────────────────────────────────────────────────
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SingleForm>({
     resolver: zodResolver(singleSchema),
     defaultValues: { issueDate: new Date().toISOString().slice(0, 10), sendEmail: true },
@@ -59,7 +56,6 @@ export default function NewCertificate({ bulk = false }: Props) {
     }
   }
 
-  // ── Bulk form ──────────────────────────────────────────────────────────
   async function onBulkSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!csvFile) { toast.error('Select a CSV file.'); return; }
@@ -79,7 +75,6 @@ export default function NewCertificate({ bulk = false }: Props) {
     }
   }
 
-  // ── Success state ──────────────────────────────────────────────────────
   if (issued) return (
     <div className="max-w-lg mx-auto text-center py-20">
       <CheckCircle size={56} className="text-brand-mid mx-auto mb-4" />
@@ -92,7 +87,6 @@ export default function NewCertificate({ bulk = false }: Props) {
     </div>
   );
 
-  // ── Bulk mode ──────────────────────────────────────────────────────────
   if (bulk) return (
     <div className="max-w-2xl mx-auto">
       <h1 className="font-serif text-3xl text-brand-dark mb-2">Bulk Issue Certificates</h1>
@@ -134,7 +128,6 @@ export default function NewCertificate({ bulk = false }: Props) {
     </div>
   );
 
-  // ── Single mode ────────────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="font-serif text-3xl text-brand-dark mb-2">Issue Certificate</h1>

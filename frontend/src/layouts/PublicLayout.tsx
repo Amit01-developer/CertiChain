@@ -16,7 +16,6 @@ export default function PublicLayout() {
             CertiChain
           </Link>
 
-          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
             <NavLink to="/#features" className="text-gray-600 hover:text-brand-dark">Features</NavLink>
             <NavLink to="/verify" className="text-gray-600 hover:text-brand-dark">Verify</NavLink>
@@ -30,13 +29,11 @@ export default function PublicLayout() {
             )}
           </nav>
 
-          {/* Mobile toggle */}
           <button className="md:hidden" onClick={() => setMobileOpen(o => !o)} aria-label="Menu">
             {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
 
-        {/* Mobile nav */}
         {mobileOpen && (
           <div className="md:hidden border-t border-brand-border bg-white px-5 py-4 flex flex-col gap-3 text-sm font-medium">
             <Link to="/verify" onClick={() => setMobileOpen(false)} className="text-gray-700">Verify Certificate</Link>

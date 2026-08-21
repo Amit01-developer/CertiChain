@@ -46,7 +46,6 @@ export default function VerifyDetail() {
     </div>
   );
 
-  // NOT FOUND
   if (!result || result.status === 'NOT_FOUND') return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-5">
       <div className="card max-w-md w-full text-center py-12">
@@ -68,7 +67,6 @@ export default function VerifyDetail() {
 
   return (
     <div className="max-w-2xl mx-auto px-5 py-12">
-      {/* Status Banner */}
       {result.status === 'ACTIVE' && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 px-5 py-4 mb-8">
           <CheckCircle size={24} className="text-green-600 shrink-0" />
@@ -97,7 +95,6 @@ export default function VerifyDetail() {
         </div>
       )}
 
-      {/* Details Card */}
       <div className="card mb-6">
         <p className="overline mb-4">Certificate Details</p>
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
@@ -126,7 +123,6 @@ export default function VerifyDetail() {
         )}
       </div>
 
-      {/* Actions + QR */}
       <div className="card">
         <div className="flex flex-col sm:flex-row gap-6 items-start">
           {qrSrc && (

@@ -1,7 +1,6 @@
 import { config } from 'dotenv';
 import path from 'path';
 
-// Load .env from project root
 config({ path: path.resolve(__dirname, '../../../.env') });
 
 function required(key: string): string {
@@ -23,7 +22,6 @@ export const env = {
   FRONTEND_URL:    optional('FRONTEND_URL', 'http://localhost:5173'),
   BACKEND_URL:     optional('BACKEND_URL', 'http://localhost:4000'),
 
-  // Storage
   STORAGE_PROVIDER:  optional('STORAGE_PROVIDER', 'local') as 'local' | 's3' | 'cloudinary',
   STORAGE_LOCAL_DIR: optional('STORAGE_LOCAL_DIR', './uploads'),
   AWS_REGION:        optional('AWS_REGION'),
@@ -31,7 +29,6 @@ export const env = {
   AWS_SECRET_KEY:    optional('AWS_SECRET_ACCESS_KEY'),
   AWS_S3_BUCKET:     optional('AWS_S3_BUCKET'),
 
-  // Email
   EMAIL_PROVIDER:  optional('EMAIL_PROVIDER', 'log') as 'smtp' | 'resend' | 'sendgrid' | 'log',
   EMAIL_FROM:      optional('EMAIL_FROM', 'noreply@certichain.com'),
   EMAIL_FROM_NAME: optional('EMAIL_FROM_NAME', 'CertiChain'),
@@ -41,16 +38,13 @@ export const env = {
   SMTP_PASS:       optional('SMTP_PASS'),
   RESEND_API_KEY:  optional('RESEND_API_KEY'),
 
-  // Rate limiting
   RATE_LIMIT_WINDOW_MS:  parseInt(optional('RATE_LIMIT_WINDOW_MS', '900000'), 10),
   RATE_LIMIT_MAX:        parseInt(optional('RATE_LIMIT_MAX', '100'), 10),
   VERIFY_RATE_LIMIT_MAX: parseInt(optional('VERIFY_RATE_LIMIT_MAX', '30'), 10),
 
-  // Google OAuth
   GOOGLE_CLIENT_ID:     optional('GOOGLE_CLIENT_ID'),
   GOOGLE_CLIENT_SECRET: optional('GOOGLE_CLIENT_SECRET'),
 
-  // Firebase Admin (for verifying frontend ID tokens)
   FIREBASE_PROJECT_ID:   optional('FIREBASE_PROJECT_ID'),
   FIREBASE_CLIENT_EMAIL: optional('FIREBASE_CLIENT_EMAIL'),
   FIREBASE_PRIVATE_KEY:  optional('FIREBASE_PRIVATE_KEY'),

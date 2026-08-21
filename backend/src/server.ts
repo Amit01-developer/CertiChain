@@ -4,7 +4,6 @@ import { logger } from './utils/logger';
 import prisma from './config/prisma';
 
 async function start() {
-  // Verify DB connection
   await prisma.$connect();
   logger.info('✓ Database connected');
 
@@ -14,7 +13,6 @@ async function start() {
     logger.info(`  API:    http://localhost:${env.PORT}/api`);
   });
 
-  // Graceful shutdown
   process.on('SIGTERM', async () => {
     logger.info('SIGTERM received — shutting down gracefully');
     server.close(async () => {

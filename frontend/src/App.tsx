@@ -5,7 +5,6 @@ import PublicLayout from './layouts/PublicLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import Spinner from './components/ui/Spinner';
 
-// Public pages
 const Landing       = lazy(() => import('./pages/Landing'));
 const Login         = lazy(() => import('./pages/Login'));
 const Register      = lazy(() => import('./pages/Register'));
@@ -16,7 +15,6 @@ const VerifySearch   = lazy(() => import('./pages/VerifySearch'));
 const VerifyDetail   = lazy(() => import('./pages/VerifyDetail'));
 const NotFound       = lazy(() => import('./pages/NotFound'));
 
-// Dashboard pages
 const Dashboard         = lazy(() => import('./pages/dashboard/Dashboard'));
 const Certificates      = lazy(() => import('./pages/dashboard/Certificates'));
 const NewCertificate    = lazy(() => import('./pages/dashboard/NewCertificate'));
@@ -40,7 +38,6 @@ function AppRoutes() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Spinner size="lg" /></div>}>
       <Routes>
-        {/* Public */}
         <Route element={<PublicLayout />}>
           <Route path="/"                   element={<Landing />} />
           <Route path="/login"              element={<Login />} />
@@ -52,7 +49,6 @@ function AppRoutes() {
           <Route path="/verify/:id"         element={<VerifyDetail />} />
         </Route>
 
-        {/* Dashboard */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route index                            element={<Dashboard />} />
           <Route path="certificates"              element={<Certificates />} />

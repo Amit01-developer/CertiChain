@@ -6,7 +6,6 @@ import { uploadLogo } from '../middleware/upload.middleware';
 
 const router = Router({ mergeParams: true });
 
-// All org routes require auth + org membership
 router.use(requireAuth);
 
 router.get('/',         requireOrgRole('STAFF', 'ADMIN', 'OWNER'), organizationController.getMyOrg);

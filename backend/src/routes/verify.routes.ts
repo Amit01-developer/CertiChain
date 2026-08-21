@@ -13,7 +13,6 @@ const verifyLimiter = rateLimit({
   legacyHeaders:   false,
 });
 
-// Public — no auth required
 router.get('/:certificateId', verifyLimiter, verifyController.verify);
 
 export default router;

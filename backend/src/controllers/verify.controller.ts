@@ -7,7 +7,6 @@ export const verifyController = {
   async verify(req: Request, res: Response) {
     const certificateId = str(req.params.certificateId);
 
-    // Log this verification attempt (non-blocking)
     prisma.verificationLog.create({
       data: {
         certificateId,
@@ -34,7 +33,6 @@ export const verifyController = {
       });
     }
 
-    // Auto-expire check
     if (cert.status === 'ACTIVE' && cert.expiryDate && cert.expiryDate < new Date()) {
       await prisma.certificate.update({ where: { id: cert.id }, data: { status: 'EXPIRED' } });
       (cert as any).status = 'EXPIRED';

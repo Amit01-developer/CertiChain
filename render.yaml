@@ -1,5 +1,4 @@
 services:
-  # ── Backend API ──────────────────────────────────────────────────────────────
   - type: web
     name: certichain-backend
     runtime: docker
@@ -21,9 +20,9 @@ services:
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: FRONTEND_URL
-        sync: false          # Set manually in Render dashboard after frontend deploys
+        sync: false
       - key: BACKEND_URL
-        sync: false          # Set manually to your Render backend URL
+        sync: false
       - key: STORAGE_PROVIDER
         value: local
       - key: STORAGE_LOCAL_DIR
@@ -47,7 +46,6 @@ services:
       - key: FIREBASE_PRIVATE_KEY
         sync: false
 
-  # ── Frontend ─────────────────────────────────────────────────────────────────
   - type: web
     name: certichain-frontend
     runtime: docker
@@ -56,9 +54,9 @@ services:
     plan: free
     dockerBuildArgs:
       - key: VITE_API_URL
-        sync: false          # Set to backend URL: https://certichain-backend.onrender.com/api
+        sync: false
       - key: VITE_APP_URL
-        sync: false          # Set to frontend URL: https://certichain-frontend.onrender.com
+        sync: false
       - key: VITE_FIREBASE_API_KEY
         value: AIzaSyB7TtQX5f_2KQWhiFdkkfkdhgUN2YeAaO0
       - key: VITE_FIREBASE_AUTH_DOMAIN
@@ -68,7 +66,6 @@ services:
       - key: VITE_FIREBASE_APP_ID
         value: 1:507374991528:web:121bdcbacae609c1302a9d
 
-# ── PostgreSQL Database ───────────────────────────────────────────────────────
 databases:
   - name: certichain-db
     plan: free

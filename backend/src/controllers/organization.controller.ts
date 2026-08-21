@@ -97,7 +97,6 @@ export const organizationController = {
       prisma.verificationLog.count({
         where: { createdAt: { gte: thirtyDaysAgo } },
       }),
-      // Fetch raw certs in last 6 months to aggregate by month in JS
       prisma.certificate.findMany({
         where:  { organizationId: orgId, createdAt: { gte: sixMonthsAgo } },
         select: { createdAt: true },
@@ -105,7 +104,6 @@ export const organizationController = {
       }),
     ]);
 
-    // Aggregate by month label in application layer (avoids Prisma groupBy date truncation issues)
     const trendMap: Record<string, number> = {};
     for (const cert of rawCerts) {
       const label = new Intl.DateTimeFormat('en', { month: 'short', year: '2-digit' }).format(cert.createdAt);

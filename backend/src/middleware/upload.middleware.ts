@@ -19,12 +19,12 @@ function makeFilter(allowed: string[]) {
 
 export const uploadLogo = multer({
   storage,
-  limits:     { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  limits:     { fileSize: 2 * 1024 * 1024 },
   fileFilter: makeFilter(ALLOWED_IMAGES),
 }).single('logo');
 
 export const uploadCsv = multer({
   storage,
-  limits:     { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits:     { fileSize: 5 * 1024 * 1024 },
   fileFilter: makeFilter(ALLOWED_CSV),
 }).single('file');

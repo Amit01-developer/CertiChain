@@ -36,7 +36,6 @@ export const authController = {
       },
     });
 
-    // Create organization and set user as OWNER
     const org = await prisma.organization.create({
       data: {
         name:    organizationName,
@@ -47,7 +46,6 @@ export const authController = {
       },
     });
 
-    // Send verification email
     const { subject, html } = emailService.verificationEmail(name, emailToken);
     await emailService.send({ to: email, subject, html });
 
@@ -67,7 +65,6 @@ export const authController = {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return unauthorized(res, 'Invalid email or password.');
 
-    // Fetch first org membership
     const membership = await prisma.orgMember.findFirst({
       where:   { userId: user.id },
       include: { organization: true },
@@ -110,11 +107,10 @@ export const authController = {
     const { email } = req.body;
 
     const user = await prisma.user.findUnique({ where: { email } });
-    // Always return same message to prevent email enumeration
     if (!user) return ok(res, null, 'If that email exists, a reset link has been sent.');
 
     const resetToken = randomBytes(32).toString('hex');
-    const resetExp   = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const resetExp   = new Date(Date.now() + 60 * 60 * 1000);
 
     await prisma.user.update({
       where: { id: user.id },
@@ -184,7 +180,6 @@ export const authController = {
     return ok(res, null, 'Password updated successfully.');
   },
 
-  // ── Firebase Google Sign-In ─────────────────────────────────────────────────
   async firebaseLogin(req: Request, res: Response) {
     const { idToken } = req.body;
     if (!idToken) return badRequest(res, 'Firebase ID token is required.');
@@ -199,23 +194,19 @@ export const authController = {
     const { uid, email, name, picture } = decoded;
     if (!email) return badRequest(res, 'No email found in Google account.');
 
-    // Find or create user
     let user = await prisma.user.findFirst({
       where: { oauthProvider: 'google', oauthId: uid },
     });
 
     if (!user) {
-      // Try to link by email (existing email/password account)
       user = await prisma.user.findUnique({ where: { email } }) ?? null;
 
       if (user) {
-        // Link Google to existing account
         user = await prisma.user.update({
           where: { id: user.id },
           data:  { oauthProvider: 'google', oauthId: uid, avatarUrl: picture ?? null, emailVerified: true },
         });
       } else {
-        // Create brand-new user
         user = await prisma.user.create({
           data: {
             name:          name ?? email.split('@')[0],
@@ -228,7 +219,6 @@ export const authController = {
           },
         });
 
-        // Auto-create a default org for them
         await prisma.organization.create({
           data: {
             name:    `${user.name}'s Organization`,
@@ -240,7 +230,6 @@ export const authController = {
       }
     }
 
-    // Fetch first org membership
     const membership = await prisma.orgMember.findFirst({
       where:   { userId: user.id },
       include: { organization: true },

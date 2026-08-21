@@ -23,7 +23,6 @@ export default function Landing() {
 
   return (
     <div>
-      {/* Hero */}
       <section className="max-w-6xl mx-auto px-5 py-24 grid md:grid-cols-2 gap-16 items-center">
         <div>
           <p className="overline mb-3">Digital Certificate Platform</p>
@@ -40,7 +39,6 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* Sample certificate card */}
         <div className="relative">
           <div className="bg-white border-2 border-brand-border p-8 shadow-[8px_8px_0_#ded6c5] rotate-1">
             <p className="text-xs font-mono tracking-widest text-gray-400 mb-4">SAMPLE CERTIFICATE</p>
@@ -55,7 +53,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Stats */}
       <section className="bg-brand-dark text-white py-8">
         <div className="max-w-6xl mx-auto px-5 grid grid-cols-3 gap-6">
           {[['SHA-256', 'Cryptographic hashing'], ['QR', 'Instant scan & verify'], ['REST API', 'Full backend integration']].map(([b, s]) => (
@@ -67,7 +64,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Features */}
       <section id="features" className="max-w-6xl mx-auto px-5 py-24">
         <p className="overline mb-3 text-center">Features</p>
         <h2 className="font-serif text-4xl text-brand-dark text-center mb-14">Everything you need</h2>
@@ -84,7 +80,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* How it works */}
       <section className="bg-white border-y border-brand-border py-24">
         <div className="max-w-6xl mx-auto px-5">
           <p className="overline mb-3 text-center">How It Works</p>
@@ -105,7 +100,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Verify CTA */}
       <section className="bg-brand-cream py-24">
         <div className="max-w-xl mx-auto px-5 text-center">
           <p className="overline mb-3">Public Verification</p>
@@ -124,7 +118,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* CTA */}
       <section className="bg-brand-dark text-white py-24 text-center">
         <div className="max-w-xl mx-auto px-5">
           <h2 className="font-serif text-4xl mb-4">Ready to get started?</h2>

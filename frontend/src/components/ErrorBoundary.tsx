@@ -15,7 +15,6 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // In production this would go to a logging service (Sentry, etc.)
     console.error('ErrorBoundary caught:', error, info);
   }
 

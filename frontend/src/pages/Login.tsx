@@ -13,7 +13,6 @@ const schema = z.object({
 });
 type Form = z.infer<typeof schema>;
 
-// Google "G" SVG icon (official brand colours)
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -68,7 +67,6 @@ export default function Login() {
         </div>
 
         <div className="card">
-          {/* Google Sign-In */}
           <button
             type="button"
             onClick={handleGoogleLogin}
@@ -79,14 +77,12 @@ export default function Login() {
             {googleLoading ? 'Signing in…' : 'Continue with Google'}
           </button>
 
-          {/* Divider */}
           <div className="flex items-center gap-3 my-5">
             <hr className="flex-1 border-brand-border" />
             <span className="text-xs text-gray-400 uppercase tracking-wide">or</span>
             <hr className="flex-1 border-brand-border" />
           </div>
 
-          {/* Email / Password form */}
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
             <div>
               <label className="label" htmlFor="email">Email address</label>

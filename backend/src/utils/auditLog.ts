@@ -25,6 +25,5 @@ export async function audit(opts: AuditOptions): Promise<void> {
       },
     });
   } catch {
-    // Audit log failures must never break the main flow
   }
 }

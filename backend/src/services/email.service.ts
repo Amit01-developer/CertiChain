@@ -8,10 +8,6 @@ interface SendOptions {
   text?:   string;
 }
 
-/**
- * Email service — pluggable provider (log / smtp / resend).
- * Set EMAIL_PROVIDER in .env. In dev the 'log' provider prints to console.
- */
 export class EmailService {
   async send(opts: SendOptions): Promise<void> {
     switch (env.EMAIL_PROVIDER) {
@@ -56,7 +52,6 @@ export class EmailService {
     });
   }
 
-  // ── Template helpers ──────────────────────────────────────────────────────
 
   verificationEmail(name: string, token: string): Pick<SendOptions, 'subject' | 'html'> {
     const url = `${env.FRONTEND_URL}/verify-email?token=${token}`;

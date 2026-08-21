@@ -8,10 +8,6 @@ export interface UploadResult {
   key:  string;
 }
 
-/**
- * Storage service — abstraction over local file system / S3 / Cloudinary.
- * Swap the provider by changing STORAGE_PROVIDER in .env.
- */
 export class StorageService {
   async upload(
     buffer:   Buffer,
@@ -33,7 +29,6 @@ export class StorageService {
     }
   }
 
-  // ── Local ──────────────────────────────────────────────────────────────────
 
   private async uploadLocal(buffer: Buffer, filename: string): Promise<UploadResult> {
     const dir = path.resolve(env.STORAGE_LOCAL_DIR);
@@ -53,7 +48,6 @@ export class StorageService {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   }
 
-  // ── AWS S3 ─────────────────────────────────────────────────────────────────
 
   private async uploadS3(buffer: Buffer, filename: string, mimeType: string): Promise<UploadResult> {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -83,7 +77,6 @@ export class StorageService {
     await client.send(new DeleteObjectCommand({ Bucket: env.AWS_S3_BUCKET, Key: key }));
   }
 
-  // ── Cloudinary ─────────────────────────────────────────────────────────────
 
   private async uploadCloudinary(buffer: Buffer, filename: string): Promise<UploadResult> {
     // @ts-ignore — optional dep: install cloudinary if using Cloudinary storage

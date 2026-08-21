@@ -1,44 +1,33 @@
-# Dependencies
 node_modules/
 
-# Build output
 dist/
 
-# Environment files — NEVER commit these
 .env
 .env.local
 .env.*.local
 
-# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Uploaded files (generated at runtime)
 uploads/
 backend/uploads/
-# Keep the folder structure in git
 !uploads/.gitkeep
 !backend/uploads/.gitkeep
 
-# Test coverage
 coverage/
 
-# Misc build artifacts
 artifacts/
 cache/
 typechain-types/
 
-# SQLite dev DB
 prisma/dev.db
 
-# OS files
 .DS_Store
 Thumbs.db
 Desktop.ini
 
-# IDE / Editor
 .vscode/settings.json
 .vscode/launch.json
 .idea/

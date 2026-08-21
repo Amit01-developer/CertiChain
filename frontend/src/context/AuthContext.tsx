@@ -63,11 +63,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function loginWithFirebase() {
-    // Opens Google popup — Firebase handles the OAuth flow
     const result   = await signInWithPopup(auth, googleProvider);
     const idToken  = await result.user.getIdToken();
 
-    // Send ID token to our backend to verify and get a CertiChain JWT
     const res = await api.post('/auth/firebase', { idToken });
     const { token, user, organization } = res.data.data;
     localStorage.setItem('cc_token', token);
