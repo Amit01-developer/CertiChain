@@ -90,7 +90,6 @@ export interface Certificate {
   createdAt:       string;
   recipient:       Recipient;
   template?:       { id: string; name: string } | null;
-  // Blockchain fields (present on getById, may be absent on list)
   blockchainStatus?:   BlockchainStatus | null;
   blockchainTxHash?:   string | null;
   blockchainHash?:     string | null;

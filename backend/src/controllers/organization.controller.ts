@@ -34,7 +34,6 @@ export const organizationController = {
     const orgId = req.orgId!;
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
 
-    // Derive a clean extension from the mime type (handles image/svg+xml → svg)
     const mimeToExt: Record<string, string> = {
       'image/jpeg':   'jpg',
       'image/png':    'png',

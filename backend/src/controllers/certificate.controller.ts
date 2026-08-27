@@ -16,8 +16,6 @@ import { parse as parseCsv } from 'csv-parse/sync';
 import QRCode from 'qrcode';
 import type { CertificateStatus } from '@prisma/client';
 
-// ─── Shared certificate-asset builder (unchanged) ────────────────────────────
-
 async function buildCertificate(orgId: string, recipientId: string, data: any, userId: string) {
   const certId = generateCertificateId();
   const verificationUrl = `${env.FRONTEND_URL}/verify/${certId}`;
@@ -68,8 +66,6 @@ async function buildCertificate(orgId: string, recipientId: string, data: any, u
     certHash,
   };
 }
-
-// ─── Blockchain registration helper ──────────────────────────────────────────
 
 async function registerOnBlockchain(
   certDbId:       string,
@@ -123,8 +119,6 @@ async function registerOnBlockchain(
   }
 }
 
-// ─── Controller ───────────────────────────────────────────────────────────────
-
 export const certificateController = {
 
   async list(req: Request, res: Response) {
@@ -163,7 +157,6 @@ export const certificateController = {
       customMessage, issueDate, expiryDate, templateId, sendEmail,
     } = req.body;
 
-    // ── Validate templateId belongs to this org (if provided) ────────────────
     const resolvedTemplateId = templateId || null;
     if (resolvedTemplateId) {
       const template = await prisma.certificateTemplate.findFirst({
@@ -193,7 +186,6 @@ export const certificateController = {
 
     const { certId, verificationUrl, pdfUrl, qrUrl, certHash } = buildResult;
 
-    // ── 1. Save to DB first (always succeeds even if blockchain is down) ─────
     const cert = await prisma.certificate.create({
       data: {
         certificateId:   certId,
@@ -209,7 +201,6 @@ export const certificateController = {
         verificationUrl,
         certificateHash: certHash,
         issuedById:      req.user!.userId,
-        // Blockchain fields start as PENDING; updated asynchronously below
         blockchainStatus: blockchainService.isEnabled ? 'PENDING' : 'FAILED',
       },
       include: { recipient: true },
@@ -222,10 +213,8 @@ export const certificateController = {
       ipAddress: req.ip,
     });
 
-    // ── 2. Register on blockchain (non-blocking — does not delay the response) ─
     registerOnBlockchain(cert.id, certId, certHash, orgId, req.user!.userId, req.ip).catch(() => {});
 
-    // ── 3. Send email ─────────────────────────────────────────────────────────
     if (sendEmail) {
       try {
         const org = await prisma.organization.findUnique({ where: { id: orgId } });
@@ -264,7 +253,6 @@ export const certificateController = {
     if (!cert) return notFound(res, 'Certificate not found.');
     if (cert.status === 'REVOKED') return conflict(res, 'Certificate is already revoked.');
 
-    // ── 1. Update DB ──────────────────────────────────────────────────────────
     await prisma.$transaction([
       prisma.certificate.update({
         where: { id: certId },
@@ -281,7 +269,6 @@ export const certificateController = {
       metadata: { reason }, ipAddress: req.ip,
     });
 
-    // ── 2. Revoke on blockchain (fire-and-forget) ─────────────────────────────
     if (cert.certificateHash && blockchainService.isEnabled) {
       blockchainService.revokeCertificate(cert.certificateHash).then(async (result) => {
         if (result.success) {
@@ -387,7 +374,6 @@ export const certificateController = {
           },
         });
 
-        // Fire-and-forget blockchain registration per certificate
         registerOnBlockchain(cert.id, certId, certHash, orgId, req.user!.userId, req.ip).catch(() => {});
 
         results.push({ certificateId: certId, name: row.name, email: row.email });

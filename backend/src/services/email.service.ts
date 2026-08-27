@@ -41,7 +41,6 @@ export class EmailService {
   }
 
   private async sendResend(opts: SendOptions): Promise<void> {
-    // @ts-ignore — optional dep: install resend package if using Resend provider
     const { Resend } = await import('resend');
     const resend = new Resend(env.RESEND_API_KEY);
     await resend.emails.send({

@@ -22,7 +22,6 @@ export const adminController = {
       prisma.certificate.count({ where: { blockchainStatus: 'PENDING' } }),
     ]);
 
-    // Blockchain connectivity check (non-blocking)
     const bcHealth = blockchainService.isEnabled
       ? await blockchainService.healthCheck()
       : { connected: false };

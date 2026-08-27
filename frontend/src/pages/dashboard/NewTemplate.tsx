@@ -231,7 +231,6 @@ export default function NewTemplate() {
   const orgId = organization?.id ?? '';
   const navigate = useNavigate();
 
-  // After template is created we get its id so we can upload the custom image
   const [createdId, setCreatedId]         = useState<string | null>(null);
   const [imageFile,   setImageFile]       = useState<File | null>(null);
   const [imagePreview, setImagePreview]   = useState<string | null>(null);
@@ -263,7 +262,6 @@ export default function NewTemplate() {
     const template = res.data.data;
     setCreatedId(template.id);
 
-    // If an image was selected, upload it immediately after creation
     if (imageFile) {
       setUploadingImg(true);
       try {

@@ -3,7 +3,6 @@ import "@nomicfoundation/hardhat-toolbox";
 import * as dotenv from "dotenv";
 import path from "path";
 
-// Load root .env
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const PRIVATE_KEY = process.env.BLOCKCHAIN_PRIVATE_KEY ?? "";

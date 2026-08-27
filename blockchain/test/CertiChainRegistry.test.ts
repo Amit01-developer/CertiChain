@@ -3,9 +3,7 @@ import { ethers }        from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { CertiChainRegistry } from "../typechain-types";
 
-// Helper: produce a fake but realistic SHA-256 hex string
 function fakeHash(seed: string): string {
-  // Just a deterministic 64-char hex for testing purposes
   return ethers.keccak256(ethers.toUtf8Bytes(seed)).replace("0x", "").padEnd(64, "0");
 }
 
@@ -29,8 +27,6 @@ describe("CertiChainRegistry", () => {
     await registry.waitForDeployment();
   });
 
-  // ─── Test 1: Register certificate ──────────────────────────────────────
-
   describe("registerCertificate()", () => {
     it("owner can register a certificate", async () => {
       await expect(registry.registerCertificate(certId1, certHash1))
@@ -50,8 +46,6 @@ describe("CertiChainRegistry", () => {
       ).to.emit(registry, "CertificateRegistered");
     });
 
-    // ─── Test 2: Duplicate registration rejected ────────────────────────
-
     it("rejects duplicate hash registration", async () => {
       await registry.registerCertificate(certId1, certHash1);
       await expect(
@@ -66,16 +60,12 @@ describe("CertiChainRegistry", () => {
       ).to.be.revertedWith("CertiChain: certificateId already registered");
     });
 
-    // ─── Test 6: Unauthorized registration rejected ─────────────────────
-
     it("rejects registration from unauthorized address", async () => {
       await expect(
         registry.connect(unauthorized).registerCertificate(certId1, certHash1)
       ).to.be.revertedWith("CertiChain: caller is not authorized");
     });
   });
-
-  // ─── Test 3: Correct hash verified ─────────────────────────────────────
 
   describe("verifyCertificate()", () => {
     beforeEach(async () => {
@@ -93,8 +83,6 @@ describe("CertiChainRegistry", () => {
       expect(certId).to.equal(certId1);
     });
 
-    // ─── Test 4: Wrong hash detected ────────────────────────────────────
-
     it("returns exists=false for an unregistered hash", async () => {
       const wrongHash = fakeHash("wrong-certificate-data");
       const [exists] = await registry.verifyCertificate(wrongHash);
@@ -109,8 +97,6 @@ describe("CertiChainRegistry", () => {
       expect(await registry.isValid(fakeHash("nonexistent"))).to.equal(false);
     });
   });
-
-  // ─── Test 5: Certificate revoked ────────────────────────────────────────
 
   describe("revokeCertificate()", () => {
     beforeEach(async () => {
@@ -144,16 +130,12 @@ describe("CertiChainRegistry", () => {
       ).to.be.revertedWith("CertiChain: certificate not found");
     });
 
-    // ─── Test 6 (revoke): Unauthorized revocation rejected ───────────────
-
     it("rejects revocation from unauthorized address", async () => {
       await expect(
         registry.connect(unauthorized).revokeCertificate(certHash1)
       ).to.be.revertedWith("CertiChain: caller is not authorized");
     });
   });
-
-  // ─── Issuer management ──────────────────────────────────────────────────
 
   describe("Issuer authorization", () => {
     it("owner can authorize and de-authorize issuers", async () => {

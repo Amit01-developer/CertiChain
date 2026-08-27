@@ -3,8 +3,6 @@ import { env }    from '../../config/env';
 import { logger } from '../../utils/logger';
 import { REGISTRY_ABI } from './abi';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface RegisterResult {
   success:     boolean;
   txHash?:     string;
@@ -13,17 +11,15 @@ export interface RegisterResult {
 }
 
 export interface VerifyResult {
-  onChain:   boolean;   // found on chain
+  onChain:   boolean;
   exists:    boolean;
   revoked:   boolean;
   issuer:    string;
-  timestamp: number;   // unix seconds
+  timestamp: number;
   certId:    string;
-  hashMatch: boolean;  // certHashHex matches what we passed in
+  hashMatch: boolean;
   error?:    string;
 }
-
-// ─── Service ─────────────────────────────────────────────────────────────────
 
 class BlockchainService {
   private provider:  ethers.JsonRpcProvider | null = null;
@@ -31,7 +27,6 @@ class BlockchainService {
   private contract:  ethers.Contract          | null = null;
   private networkName = 'Polygon Amoy';
 
-  /** Lazy-initialise provider/signer/contract on first use. */
   private init(): boolean {
     if (this.contract) return true;
 
@@ -58,7 +53,6 @@ class BlockchainService {
     }
   }
 
-  /** Whether blockchain integration is active and properly configured. */
   get isEnabled(): boolean {
     return env.BLOCKCHAIN_ENABLED &&
       !!env.BLOCKCHAIN_RPC_URL &&
@@ -66,10 +60,6 @@ class BlockchainService {
       !!env.BLOCKCHAIN_CONTRACT_ADDRESS;
   }
 
-  /**
-   * Register a certificate hash on-chain.
-   * Never throws — returns success/failure in the result object.
-   */
   async registerCertificate(certificateId: string, certHashHex: string): Promise<RegisterResult> {
     if (!this.init()) {
       return { success: false, error: 'Blockchain not enabled or not configured.' };
@@ -79,8 +69,7 @@ class BlockchainService {
       logger.info('[Blockchain] Registering certificate', { certificateId });
 
       const tx = await (this.contract as any).registerCertificate(certificateId, certHashHex);
-      const receipt: ethers.TransactionReceipt = await tx.wait(1); // wait 1 confirmation
-
+      const receipt: ethers.TransactionReceipt = await tx.wait(1);
       logger.info('[Blockchain] Certificate registered', {
         certificateId,
         txHash: receipt.hash,
@@ -98,10 +87,6 @@ class BlockchainService {
     }
   }
 
-  /**
-   * Verify a certificate hash against the on-chain registry.
-   * Never throws — returns a structured result.
-   */
   async verifyCertificate(certHashHex: string): Promise<VerifyResult> {
     const notFound: VerifyResult = {
       onChain: false, exists: false, revoked: false,
@@ -123,8 +108,7 @@ class BlockchainService {
         issuer,
         timestamp: Number(timestamp),
         certId,
-        hashMatch: exists, // if it exists, the hash matched (we queried by hash)
-      };
+        hashMatch: exists,      };
     } catch (err: any) {
       const message = err?.shortMessage ?? err?.message ?? 'Unknown blockchain error';
       logger.error('[Blockchain] verifyCertificate failed', { error: message });
@@ -132,10 +116,6 @@ class BlockchainService {
     }
   }
 
-  /**
-   * Revoke a certificate on-chain.
-   * Never throws — returns success/failure.
-   */
   async revokeCertificate(certHashHex: string): Promise<RegisterResult> {
     if (!this.init()) {
       return { success: false, error: 'Blockchain not enabled or not configured.' };
@@ -157,7 +137,6 @@ class BlockchainService {
     }
   }
 
-  /** Ping the RPC to check connectivity. */
   async healthCheck(): Promise<{ connected: boolean; blockNumber?: number; error?: string }> {
     if (!this.init()) return { connected: false, error: 'Not configured.' };
     try {

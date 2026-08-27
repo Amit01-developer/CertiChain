@@ -34,7 +34,6 @@ export class StorageService {
     const dir = path.resolve(env.STORAGE_LOCAL_DIR);
     fs.mkdirSync(dir, { recursive: true });
 
-    // Normalise the extension before sanitising so that e.g. "svg+xml" → "svg"
     const normalised = filename.replace(/\.svg\+xml$/i, '.svg');
     const safe = normalised.replace(/[^a-zA-Z0-9._-]/g, '_');
     const dest = path.join(dir, safe);
@@ -52,8 +51,6 @@ export class StorageService {
 
 
   private async uploadS3(buffer: Buffer, filename: string, mimeType: string): Promise<UploadResult> {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore — optional dep: install @aws-sdk/client-s3 if using S3
     const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
     const client = new S3Client({
       region: env.AWS_REGION,
@@ -73,7 +70,6 @@ export class StorageService {
   }
 
   private async deleteS3(key: string): Promise<void> {
-    // @ts-ignore — optional dep
     const { S3Client, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
     const client = new S3Client({ region: env.AWS_REGION });
     await client.send(new DeleteObjectCommand({ Bucket: env.AWS_S3_BUCKET, Key: key }));
@@ -81,7 +77,6 @@ export class StorageService {
 
 
   private async uploadCloudinary(buffer: Buffer, filename: string): Promise<UploadResult> {
-    // @ts-ignore — optional dep: install cloudinary if using Cloudinary storage
     const { v2: cloudinary } = await import('cloudinary');
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME ?? '',
@@ -92,7 +87,6 @@ export class StorageService {
     const result = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         { resource_type: 'auto', public_id: `certichain/${filename}` },
-        // @ts-ignore
         (err: any, res: any) => { if (err) reject(err); else resolve(res); }
       ).end(buffer);
     });
@@ -101,7 +95,6 @@ export class StorageService {
   }
 
   private async deleteCloudinary(key: string): Promise<void> {
-    // @ts-ignore — optional dep
     const { v2: cloudinary } = await import('cloudinary');
     await cloudinary.uploader.destroy(key);
   }

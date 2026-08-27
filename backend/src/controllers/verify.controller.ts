@@ -10,7 +10,6 @@ export const verifyController = {
   async verify(req: Request, res: Response) {
     const certificateId = str(req.params.certificateId);
 
-    // Fire-and-forget verification log
     prisma.verificationLog.create({
       data: {
         certificateId,
@@ -37,13 +36,11 @@ export const verifyController = {
       });
     }
 
-    // Auto-expire
     if (cert.status === 'ACTIVE' && cert.expiryDate && cert.expiryDate < new Date()) {
       await prisma.certificate.update({ where: { id: cert.id }, data: { status: 'EXPIRED' } });
       (cert as any).status = 'EXPIRED';
     }
 
-    // ── Blockchain verification ─────────────────────────────────────────────
     let blockchainVerification: {
       enabled:        boolean;
       onChain:        boolean;
@@ -85,14 +82,12 @@ export const verifyController = {
         blockchainVerification.hashMatch   = true;
         blockchainVerification.registeredAt = bcResult.timestamp;
       } else {
-        // Exists, not revoked — hash matched (we queried by hash so it's always a match)
         blockchainVerification.status      = 'VERIFIED';
         blockchainVerification.onChain     = true;
         blockchainVerification.hashMatch   = true;
         blockchainVerification.registeredAt = bcResult.timestamp;
       }
 
-      // Audit only successful on-chain verifications to avoid log spam
       if (bcResult.exists) {
         audit({
           action:       'BLOCKCHAIN_VERIFIED',
@@ -109,7 +104,6 @@ export const verifyController = {
       }
     }
 
-    // ── Build base response payload ─────────────────────────────────────────
     const base = {
       certificateId:   cert.certificateId,
       title:           cert.title,

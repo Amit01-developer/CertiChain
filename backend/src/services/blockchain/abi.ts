@@ -1,9 +1,4 @@
-/**
- * Minimal ABI for CertiChainRegistry.sol
- * Only the functions the backend actually calls are included.
- */
 export const REGISTRY_ABI = [
-  // registerCertificate(string certificateId, string certHashHex)
   {
     inputs: [
       { internalType: "string", name: "certificateId", type: "string" },
@@ -14,7 +9,6 @@ export const REGISTRY_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
-  // verifyCertificate(string certHashHex) view
   {
     inputs: [{ internalType: "string", name: "certHashHex", type: "string" }],
     name: "verifyCertificate",
@@ -28,7 +22,6 @@ export const REGISTRY_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  // revokeCertificate(string certHashHex)
   {
     inputs: [{ internalType: "string", name: "certHashHex", type: "string" }],
     name: "revokeCertificate",
@@ -36,7 +29,6 @@ export const REGISTRY_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
-  // isValid(string certHashHex) view
   {
     inputs: [{ internalType: "string", name: "certHashHex", type: "string" }],
     name: "isValid",
@@ -44,7 +36,6 @@ export const REGISTRY_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  // Events
   {
     anonymous: false,
     inputs: [

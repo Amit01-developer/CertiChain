@@ -60,7 +60,6 @@ export const templateController = {
     return ok(res, null, 'Template deleted.');
   },
 
-  /** Upload a custom image (seal / watermark) for this template. */
   async uploadImage(req: Request, res: Response) {
     const id = str(req.params.id);
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
@@ -70,7 +69,6 @@ export const templateController = {
     });
     if (!t) return notFound(res, 'Template not found.');
 
-    // Derive a clean extension from the mime type
     const mimeToExt: Record<string, string> = {
       'image/jpeg':    'jpg',
       'image/png':     'png',
@@ -85,7 +83,6 @@ export const templateController = {
       req.file.mimetype,
     );
 
-    // Store the URL inside the configuration JSON so no schema migration is needed
     const currentConfig = (t.configuration ?? {}) as Record<string, unknown>;
     const updated = await prisma.certificateTemplate.update({
       where: { id },
