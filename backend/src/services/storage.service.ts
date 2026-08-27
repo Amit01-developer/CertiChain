@@ -34,7 +34,9 @@ export class StorageService {
     const dir = path.resolve(env.STORAGE_LOCAL_DIR);
     fs.mkdirSync(dir, { recursive: true });
 
-    const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    // Normalise the extension before sanitising so that e.g. "svg+xml" → "svg"
+    const normalised = filename.replace(/\.svg\+xml$/i, '.svg');
+    const safe = normalised.replace(/[^a-zA-Z0-9._-]/g, '_');
     const dest = path.join(dir, safe);
     fs.writeFileSync(dest, buffer);
 

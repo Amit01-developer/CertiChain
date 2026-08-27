@@ -42,6 +42,14 @@ export const env = {
   RATE_LIMIT_MAX:        parseInt(optional('RATE_LIMIT_MAX', '100'), 10),
   VERIFY_RATE_LIMIT_MAX: parseInt(optional('VERIFY_RATE_LIMIT_MAX', '30'), 10),
 
+  // ── Blockchain ────────────────────────────────────────────────────────────
+  BLOCKCHAIN_ENABLED:          optional('BLOCKCHAIN_ENABLED', 'false') === 'true',
+  BLOCKCHAIN_RPC_URL:          optional('BLOCKCHAIN_RPC_URL', 'https://rpc-amoy.polygon.technology'),
+  BLOCKCHAIN_PRIVATE_KEY:      optional('BLOCKCHAIN_PRIVATE_KEY'),
+  BLOCKCHAIN_CONTRACT_ADDRESS: optional('BLOCKCHAIN_CONTRACT_ADDRESS'),
+  BLOCKCHAIN_CHAIN_ID:         parseInt(optional('BLOCKCHAIN_CHAIN_ID', '80002'), 10),
+  BLOCKCHAIN_EXPLORER_URL:     optional('BLOCKCHAIN_EXPLORER_URL', 'https://amoy.polygonscan.com'),
+
   GOOGLE_CLIENT_ID:     optional('GOOGLE_CLIENT_ID'),
   GOOGLE_CLIENT_SECRET: optional('GOOGLE_CLIENT_SECRET'),
 

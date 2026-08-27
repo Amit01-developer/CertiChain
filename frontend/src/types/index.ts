@@ -25,6 +25,54 @@ export interface Organization {
 export type OrgMemberRole = 'OWNER' | 'ADMIN' | 'STAFF';
 export type CertificateStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED';
 
+export interface Recipient {
+  id:    string;
+  name:  string;
+  email: string;
+}
+
+export interface Template {
+  id:            string;
+  name:          string;
+  configuration: TemplateConfig;
+  previewUrl?:   string | null;
+  createdAt:     string;
+}
+
+export interface TemplateConfig {
+  layout?:          'landscape' | 'portrait';
+  primaryColor?:    string;
+  accentColor?:     string;
+  fontFamily?:      string;
+  showLogo?:        boolean;
+  showQR?:          boolean;
+  showSignature?:   boolean;
+  customImageUrl?:  string | null;
+}
+
+export type BlockchainStatus = 'PENDING' | 'CONFIRMED' | 'FAILED';
+
+export type BlockchainVerificationStatus =
+  | 'VERIFIED'
+  | 'HASH_MISMATCH'
+  | 'NOT_FOUND'
+  | 'REVOKED'
+  | 'DISABLED'
+  | 'ERROR';
+
+export interface BlockchainVerification {
+  enabled:       boolean;
+  onChain:       boolean;
+  hashMatch:     boolean;
+  revoked:       boolean;
+  txHash:        string | null;
+  txUrl:         string | null;
+  network:       string | null;
+  registeredAt:  number | null;  // unix timestamp
+  status:        BlockchainVerificationStatus;
+  error?:        string;
+}
+
 export interface Certificate {
   id:              string;
   certificateId:   string;
@@ -42,30 +90,11 @@ export interface Certificate {
   createdAt:       string;
   recipient:       Recipient;
   template?:       { id: string; name: string } | null;
-}
-
-export interface Recipient {
-  id:    string;
-  name:  string;
-  email: string;
-}
-
-export interface Template {
-  id:            string;
-  name:          string;
-  configuration: TemplateConfig;
-  previewUrl?:   string | null;
-  createdAt:     string;
-}
-
-export interface TemplateConfig {
-  layout?:       'landscape' | 'portrait';
-  primaryColor?: string;
-  accentColor?:  string;
-  fontFamily?:   string;
-  showLogo?:     boolean;
-  showQR?:       boolean;
-  showSignature?: boolean;
+  // Blockchain fields (present on getById, may be absent on list)
+  blockchainStatus?:   BlockchainStatus | null;
+  blockchainTxHash?:   string | null;
+  blockchainHash?:     string | null;
+  blockchainNetwork?:  string | null;
 }
 
 export interface VerifyResult {
@@ -84,7 +113,8 @@ export interface VerifyResult {
     verificationUrl: string;
     pdfUrl?:         string | null;
     qrCodeUrl?:      string | null;
-    revocation?: { reason: string; revokedAt: string };
+    revocation?:     { reason: string; revokedAt: string };
+    blockchain?:     BlockchainVerification;
   };
 }
 

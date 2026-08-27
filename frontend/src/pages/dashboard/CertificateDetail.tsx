@@ -5,12 +5,96 @@ import api from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Download, Copy, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Download, Copy, ExternalLink, AlertTriangle, ShieldCheck, ShieldX, ShieldAlert, ShieldOff, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
-import type { Certificate } from '../../types';
+import type { Certificate, BlockchainStatus } from '../../types';
 
 const fmt = (d: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(d));
+
+function BlockchainStatusBadge({ status }: { status: BlockchainStatus | null | undefined }) {
+  if (!status) return null;
+  const map: Record<BlockchainStatus, { label: string; cls: string; Icon: React.ElementType }> = {
+    CONFIRMED: { label: 'Blockchain Verified', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200', Icon: ShieldCheck },
+    PENDING:   { label: 'Blockchain Pending',  cls: 'text-amber-700  bg-amber-50  border-amber-200',  Icon: Loader       },
+    FAILED:    { label: 'Blockchain Failed',   cls: 'text-red-700    bg-red-50    border-red-200',    Icon: ShieldX      },
+  };
+  const { label, cls, Icon } = map[status];
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 border ${cls}`}>
+      <Icon size={11} /> {label}
+    </span>
+  );
+}
+
+function BlockchainInfoPanel({ cert }: { cert: Certificate }) {
+  const { blockchainStatus, blockchainTxHash, blockchainNetwork, blockchainHash } = cert;
+  if (!blockchainStatus) return null;
+
+  const explorerBase = import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://amoy.polygonscan.com';
+  const txUrl = blockchainTxHash ? `${explorerBase}/tx/${blockchainTxHash}` : null;
+
+  const statusConfig: Record<BlockchainStatus, { icon: React.ReactNode; heading: string; cls: string }> = {
+    CONFIRMED: {
+      icon:    <ShieldCheck size={16} className="text-emerald-600 shrink-0" />,
+      heading: '✓ Anchored on Blockchain',
+      cls:     'bg-emerald-50 border-emerald-200 text-emerald-800',
+    },
+    PENDING: {
+      icon:    <ShieldAlert size={16} className="text-amber-600 shrink-0" />,
+      heading: 'Blockchain Registration Pending',
+      cls:     'bg-amber-50 border-amber-200 text-amber-800',
+    },
+    FAILED: {
+      icon:    <ShieldX size={16} className="text-red-600 shrink-0" />,
+      heading: 'Blockchain Registration Failed',
+      cls:     'bg-red-50 border-red-200 text-red-800',
+    },
+  };
+
+  const cfg = statusConfig[blockchainStatus];
+
+  return (
+    <div className="card mb-5">
+      <p className="overline mb-3">Blockchain</p>
+
+      <div className={`flex items-center gap-2 border px-4 py-2.5 mb-4 ${cfg.cls}`}>
+        {cfg.icon}
+        <p className="text-sm font-semibold">{cfg.heading}</p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+        <div>
+          <p className="text-xs font-mono text-gray-400 uppercase tracking-wide">Network</p>
+          <p className="text-brand-dark mt-0.5">{blockchainNetwork ?? 'Polygon Amoy'}</p>
+        </div>
+        {blockchainHash && (
+          <div>
+            <p className="text-xs font-mono text-gray-400 uppercase tracking-wide">Certificate Hash</p>
+            <p className="font-mono text-xs text-brand-dark mt-0.5 break-all">{blockchainHash.slice(0, 20)}…</p>
+          </div>
+        )}
+        {blockchainTxHash && (
+          <div className="sm:col-span-2">
+            <p className="text-xs font-mono text-gray-400 uppercase tracking-wide">Transaction Hash</p>
+            <p className="font-mono text-xs text-brand-dark mt-0.5 break-all">{blockchainTxHash}</p>
+          </div>
+        )}
+      </div>
+
+      {txUrl && (
+        <a
+          href={txUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="btn-secondary flex items-center gap-2 w-full justify-center mt-4"
+        >
+          <ExternalLink size={13} /> View on Blockchain Explorer
+        </a>
+      )}
+    </div>
+  );
+}
 
 export default function CertificateDetail() {
   const { id } = useParams<{ id: string }>();
@@ -64,7 +148,10 @@ export default function CertificateDetail() {
           <h1 className="font-serif text-2xl text-brand-dark">{cert.title}</h1>
           <p className="font-mono text-sm text-brand-mid mt-1">{cert.certificateId}</p>
         </div>
-        <Badge status={cert.status} />
+        <div className="flex flex-col items-end gap-2">
+          <Badge status={cert.status} />
+          <BlockchainStatusBadge status={cert.blockchainStatus} />
+        </div>
       </div>
 
       <div className="card mb-5">
@@ -92,6 +179,8 @@ export default function CertificateDetail() {
           </div>
         )}
       </div>
+
+      <BlockchainInfoPanel cert={cert} />
 
       <div className="card mb-5">
         <div className="flex flex-col sm:flex-row gap-6 items-start">

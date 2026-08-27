@@ -24,6 +24,12 @@ enum CertificateStatus {
   EXPIRED
 }
 
+enum BlockchainStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
 model User {
   id             String   @id @default(uuid())
   name           String
@@ -129,8 +135,15 @@ model Certificate {
   pdfUrl          String?
   qrCodeUrl       String?
   verificationUrl String
-  certificateHash String?
-  issuedById      String?
+  certificateHash      String?
+  issuedById           String?
+
+  // Blockchain fields — nullable so existing certificates keep working
+  blockchainTxHash     String?
+  blockchainHash       String?
+  blockchainStatus     BlockchainStatus @default(PENDING)
+  blockchainNetwork    String?
+
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 

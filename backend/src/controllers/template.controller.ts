@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
+import { storageService } from '../services/storage.service';
 import { ok, created, notFound } from '../utils/apiResponse';
 import { audit } from '../utils/auditLog';
 import { str } from '../utils/param';
@@ -57,5 +58,49 @@ export const templateController = {
     await prisma.certificateTemplate.delete({ where: { id } });
     await audit({ userId: req.user!.userId, organizationId: req.orgId!, action: 'TEMPLATE_DELETED', resourceId: t.id });
     return ok(res, null, 'Template deleted.');
+  },
+
+  /** Upload a custom image (seal / watermark) for this template. */
+  async uploadImage(req: Request, res: Response) {
+    const id = str(req.params.id);
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
+
+    const t = await prisma.certificateTemplate.findFirst({
+      where: { id, organizationId: req.orgId! },
+    });
+    if (!t) return notFound(res, 'Template not found.');
+
+    // Derive a clean extension from the mime type
+    const mimeToExt: Record<string, string> = {
+      'image/jpeg':    'jpg',
+      'image/png':     'png',
+      'image/webp':    'webp',
+      'image/svg+xml': 'svg',
+    };
+    const ext = mimeToExt[req.file.mimetype] ?? req.file.mimetype.split('/')[1];
+
+    const result = await storageService.upload(
+      req.file.buffer,
+      `template-img-${id}.${ext}`,
+      req.file.mimetype,
+    );
+
+    // Store the URL inside the configuration JSON so no schema migration is needed
+    const currentConfig = (t.configuration ?? {}) as Record<string, unknown>;
+    const updated = await prisma.certificateTemplate.update({
+      where: { id },
+      data:  { configuration: { ...currentConfig, customImageUrl: result.url } },
+    });
+
+    await audit({
+      userId: req.user!.userId,
+      organizationId: req.orgId!,
+      action: 'TEMPLATE_IMAGE_UPLOADED',
+      resourceType: 'Template',
+      resourceId: id,
+      metadata: { url: result.url },
+    });
+
+    return ok(res, { customImageUrl: result.url, template: updated }, 'Template image uploaded.');
   },
 };

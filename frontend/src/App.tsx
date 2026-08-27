@@ -21,6 +21,7 @@ const NewCertificate    = lazy(() => import('./pages/dashboard/NewCertificate'))
 const CertificateDetail = lazy(() => import('./pages/dashboard/CertificateDetail'));
 const Templates         = lazy(() => import('./pages/dashboard/Templates'));
 const NewTemplate       = lazy(() => import('./pages/dashboard/NewTemplate'));
+const EditTemplate      = lazy(() => import('./pages/dashboard/EditTemplate'));
 const Recipients        = lazy(() => import('./pages/dashboard/Recipients'));
 const Analytics         = lazy(() => import('./pages/dashboard/Analytics'));
 const AuditLogs         = lazy(() => import('./pages/dashboard/AuditLogs'));
@@ -57,6 +58,7 @@ function AppRoutes() {
           <Route path="certificates/:id"          element={<CertificateDetail />} />
           <Route path="templates"                 element={<Templates />} />
           <Route path="templates/new"             element={<NewTemplate />} />
+          <Route path="templates/:id/edit"        element={<EditTemplate />} />
           <Route path="recipients"                element={<Recipients />} />
           <Route path="analytics"                 element={<Analytics />} />
           <Route path="audit-logs"                element={<AuditLogs />} />

@@ -4,16 +4,19 @@ import { generateCertificateId, hashCertificateData } from '../utils/certId';
 import { generateCertificatePdf } from '../services/pdf.service';
 import { storageService } from '../services/storage.service';
 import { emailService } from '../services/email.service';
+import { blockchainService } from '../services/blockchain';
 import { audit } from '../utils/auditLog';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
 import { str } from '../utils/param';
 import {
-  ok, created, notFound, conflict, forbidden, serverError, badRequest
+  ok, created, notFound, conflict, serverError, badRequest
 } from '../utils/apiResponse';
 import { parse as parseCsv } from 'csv-parse/sync';
 import QRCode from 'qrcode';
 import type { CertificateStatus } from '@prisma/client';
+
+// ─── Shared certificate-asset builder (unchanged) ────────────────────────────
 
 async function buildCertificate(orgId: string, recipientId: string, data: any, userId: string) {
   const certId = generateCertificateId();
@@ -31,17 +34,18 @@ async function buildCertificate(orgId: string, recipientId: string, data: any, u
   ]);
 
   const pdfBuffer = await generateCertificatePdf({
-    certificateId:    certId,
-    recipientName:    recipient?.name ?? data.recipientName,
-    title:            data.title,
-    achievement:      data.achievement,
-    description:      data.description,
-    customMessage:    data.customMessage,
-    issueDate:        new Date(data.issueDate),
-    expiryDate:       data.expiryDate ? new Date(data.expiryDate) : null,
-    organizationName: org?.name ?? 'Unknown Organization',
+    certificateId:          certId,
+    recipientName:          recipient?.name ?? data.recipientName,
+    title:                  data.title,
+    achievement:            data.achievement,
+    description:            data.description,
+    customMessage:          data.customMessage,
+    issueDate:              new Date(data.issueDate),
+    expiryDate:             data.expiryDate ? new Date(data.expiryDate) : null,
+    organizationName:       org?.name ?? 'Unknown Organization',
+    organizationLogoUrl:    org?.logoUrl ?? null,
     verificationUrl,
-    template:         template?.configuration as any,
+    template:               template?.configuration as any,
   });
 
   const [pdfResult, qrResult] = await Promise.all([
@@ -64,6 +68,62 @@ async function buildCertificate(orgId: string, recipientId: string, data: any, u
     certHash,
   };
 }
+
+// ─── Blockchain registration helper ──────────────────────────────────────────
+
+async function registerOnBlockchain(
+  certDbId:       string,
+  certId:         string,
+  certHash:       string,
+  orgId:          string,
+  userId:         string,
+  ipAddress?:     string,
+): Promise<void> {
+  if (!blockchainService.isEnabled) return;
+
+  const result = await blockchainService.registerCertificate(certId, certHash);
+
+  if (result.success) {
+    await prisma.certificate.update({
+      where: { id: certDbId },
+      data: {
+        blockchainTxHash:  result.txHash,
+        blockchainHash:    certHash,
+        blockchainStatus:  'CONFIRMED',
+        blockchainNetwork: result.network ?? 'Polygon Amoy',
+      },
+    });
+
+    await audit({
+      userId, organizationId: orgId,
+      action:       'BLOCKCHAIN_REGISTERED',
+      resourceType: 'Certificate',
+      resourceId:   certDbId,
+      metadata:     { txHash: result.txHash, certHash, certId },
+      ipAddress,
+    });
+  } else {
+    await prisma.certificate.update({
+      where: { id: certDbId },
+      data:  { blockchainStatus: 'FAILED' },
+    });
+
+    await audit({
+      userId, organizationId: orgId,
+      action:       'BLOCKCHAIN_FAILED',
+      resourceType: 'Certificate',
+      resourceId:   certDbId,
+      metadata:     { error: result.error, certId },
+      ipAddress,
+    });
+
+    logger.warn('[Blockchain] Registration failed — certificate saved to DB normally', {
+      certId, error: result.error,
+    });
+  }
+}
+
+// ─── Controller ───────────────────────────────────────────────────────────────
 
 export const certificateController = {
 
@@ -103,6 +163,17 @@ export const certificateController = {
       customMessage, issueDate, expiryDate, templateId, sendEmail,
     } = req.body;
 
+    // ── Validate templateId belongs to this org (if provided) ────────────────
+    const resolvedTemplateId = templateId || null;
+    if (resolvedTemplateId) {
+      const template = await prisma.certificateTemplate.findFirst({
+        where: { id: resolvedTemplateId, organizationId: orgId },
+      });
+      if (!template) {
+        return badRequest(res, 'Invalid templateId: template not found in this organization.');
+      }
+    }
+
     const recipient = await prisma.recipient.upsert({
       where:  { organizationId_email: { organizationId: orgId, email: recipientEmail } },
       update: { name: recipientName },
@@ -122,11 +193,12 @@ export const certificateController = {
 
     const { certId, verificationUrl, pdfUrl, qrUrl, certHash } = buildResult;
 
+    // ── 1. Save to DB first (always succeeds even if blockchain is down) ─────
     const cert = await prisma.certificate.create({
       data: {
         certificateId:   certId,
         organizationId:  orgId,
-        templateId:      templateId ?? null,
+        templateId:      resolvedTemplateId,
         recipientId:     recipient.id,
         title, description, achievement, customMessage,
         issueDate:       new Date(issueDate),
@@ -137,6 +209,8 @@ export const certificateController = {
         verificationUrl,
         certificateHash: certHash,
         issuedById:      req.user!.userId,
+        // Blockchain fields start as PENDING; updated asynchronously below
+        blockchainStatus: blockchainService.isEnabled ? 'PENDING' : 'FAILED',
       },
       include: { recipient: true },
     });
@@ -148,6 +222,10 @@ export const certificateController = {
       ipAddress: req.ip,
     });
 
+    // ── 2. Register on blockchain (non-blocking — does not delay the response) ─
+    registerOnBlockchain(cert.id, certId, certHash, orgId, req.user!.userId, req.ip).catch(() => {});
+
+    // ── 3. Send email ─────────────────────────────────────────────────────────
     if (sendEmail) {
       try {
         const org = await prisma.organization.findUnique({ where: { id: orgId } });
@@ -158,9 +236,7 @@ export const certificateController = {
         );
       } catch (emailErr: any) {
         logger.warn('Certificate issued but notification email failed', {
-          certId,
-          recipientEmail,
-          error: emailErr?.message,
+          certId, recipientEmail, error: emailErr?.message,
         });
       }
     }
@@ -188,6 +264,7 @@ export const certificateController = {
     if (!cert) return notFound(res, 'Certificate not found.');
     if (cert.status === 'REVOKED') return conflict(res, 'Certificate is already revoked.');
 
+    // ── 1. Update DB ──────────────────────────────────────────────────────────
     await prisma.$transaction([
       prisma.certificate.update({
         where: { id: certId },
@@ -203,6 +280,26 @@ export const certificateController = {
       action: 'CERTIFICATE_REVOKED', resourceType: 'Certificate', resourceId: certId,
       metadata: { reason }, ipAddress: req.ip,
     });
+
+    // ── 2. Revoke on blockchain (fire-and-forget) ─────────────────────────────
+    if (cert.certificateHash && blockchainService.isEnabled) {
+      blockchainService.revokeCertificate(cert.certificateHash).then(async (result) => {
+        if (result.success) {
+          await audit({
+            userId: req.user!.userId, organizationId: orgId,
+            action:       'BLOCKCHAIN_REGISTERED',   // re-use for on-chain revoke tx
+            resourceType: 'Certificate',
+            resourceId:   certId,
+            metadata:     { event: 'REVOKED', txHash: result.txHash },
+            ipAddress:    req.ip,
+          });
+        } else {
+          logger.warn('[Blockchain] On-chain revocation failed', {
+            certId: cert.certificateId, error: result.error,
+          });
+        }
+      }).catch(() => {});
+    }
 
     return ok(res, null, 'Certificate has been revoked.');
   },
@@ -256,7 +353,7 @@ export const certificateController = {
       return badRequest(res, 'CSV validation failed.', errors);
     }
 
-    const results: any[] = [];
+    const results: any[]  = [];
     const failedRows: string[] = [...errors];
 
     for (const row of valid) {
@@ -281,11 +378,17 @@ export const certificateController = {
             title:           row.certificate_title,
             issueDate:       new Date(row.issue_date),
             status:          'ACTIVE',
-            pdfUrl, qrCodeUrl: qrUrl, verificationUrl,
+            pdfUrl,
+            qrCodeUrl:       qrUrl,
+            verificationUrl,
             certificateHash: certHash,
             issuedById:      req.user!.userId,
+            blockchainStatus: blockchainService.isEnabled ? 'PENDING' : 'FAILED',
           },
         });
+
+        // Fire-and-forget blockchain registration per certificate
+        registerOnBlockchain(cert.id, certId, certHash, orgId, req.user!.userId, req.ip).catch(() => {});
 
         results.push({ certificateId: certId, name: row.name, email: row.email });
       } catch (err: any) {

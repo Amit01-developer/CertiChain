@@ -47,7 +47,9 @@ export default function NewCertificate({ bulk = false }: Props) {
 
   async function onSingleSubmit(data: SingleForm) {
     try {
-      const res = await api.post(`/organizations/${orgId}/certificates`, data);
+      // Convert empty string templateId to undefined so backend doesn't get invalid FK
+      const payload = { ...data, templateId: data.templateId || undefined };
+      const res = await api.post(`/organizations/${orgId}/certificates`, payload);
       const cert = res.data.data;
       setIssued({ certificateId: cert.certificateId, id: cert.id });
       toast.success(`Certificate ${cert.certificateId} issued!`);

@@ -1,23 +1,124 @@
 # CertiChain — Digital Certificate Management Platform
 
-CertiChain is a full-stack platform for issuing, managing, and verifying digital certificates. Organizations can issue tamper-proof PDF certificates with QR codes, manage recipients and templates, and allow anyone to publicly verify a certificate's authenticity — no blockchain required.
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/Node.js-20%2B-339933)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
+
+</div>
+
+CertiChain is a full-stack digital certificate management platform built for organizations that need a secure, scalable, and auditable way to issue, manage, and validate credentials. It combines a modern React frontend, a TypeScript backend, database-driven certificate logic, and optional blockchain anchoring to give institutions a trustworthy certificate workflow from issuance to verification.
+
+## Overview
+
+CertiChain helps universities, training providers, bootcamps, NGOs, corporates, and internal teams:
+
+- create branded certificate templates
+- issue certificates to recipients individually or in bulk
+- verify authenticity through public QR or certificate ID lookup
+- revoke or expire certificates when needed
+- track actions through audit log trails
+- manage organization members and permissions
+- optionally anchor hashes to a blockchain network for extra evidence
+
+## At a Glance
+
+- Frontend: React + Vite + Tailwind CSS
+- Backend: Node.js + Express + TypeScript
+- Database: PostgreSQL via Prisma ORM
+- Auth: JWT + Firebase Google OAuth
+- Storage: local / S3 / Cloudinary
+- Email: log / SMTP / Resend
+- Verification: public certificate lookup and QR-based validation
+- Security: SHA-256 hashing, JWT auth, role-based access, rate limiting, audit logs
+- Blockchain: optional Polygon Amoy integration for certificate registration and verification
+
+## Project Modules
+
+### 1. Frontend Application
+The React frontend provides public pages, registration and login flows, organization dashboards, certificate issuance workflows, analytics, templates, and verification pages. It is built as a SPA with route-based access control.
+
+### 2. Backend API
+The Express + TypeScript backend exposes REST APIs for authentication, organization management, recipients, certificates, templates, verification, and admin controls. It handles business logic, access checks, Prisma queries, PDF generation, and email/storage integration.
+
+### 3. Blockchain Layer
+The blockchain folder includes the Hardhat project and the `CertiChainRegistry.sol` smart contract. It anchors certificate hashes on Polygon Amoy and enables public verification of certificate authenticity on-chain.
+
+### 4. Database & Identity Layer
+Prisma manages the PostgreSQL schema for users, organizations, memberships, certificates, templates, recipients, revocations, audit logs, and verification logs. This keeps certificate records relational, searchable, and auditable.
+
+### 5. Security & Compliance Layer
+The platform includes JWT-based protected routes, organization-role enforcement, rate limiting, request validation, audit logs, and SHA-256 hash verification for tamper-evidence.
+
+## Core User Flows
+
+### Organization Setup
+- create a new organization
+- add admin/owner/staff users
+- configure branding, description, and profile data
+
+### Certificate Lifecycle
+- create recipient records
+- define certificate templates
+- issue a certificate
+- generate PDF and QR output
+- store hash and verification metadata
+- optionally revoke or expire the certificate
+
+### Public Verification
+- user enters certificate ID or scans QR code
+- backend checks certificate status and hash
+- frontend displays certificate metadata and blockchain verification state
+
+### Admin Oversight
+- view platform stats
+- inspect all organizations
+- suspend or unsuspend organizations as needed
+- monitor blockchain and certificate status
+
+---
+
+## ✨ New Features & Highlights
+
+This version includes a complete certificate lifecycle workflow with modern operational features:
+
+- **Single & Bulk Certificate Issuance** — Issue one certificate at a time or upload CSV files for bulk generation
+- **Template Builder with Live Preview** — Create reusable certificate layouts with branding, colors, fonts, and custom content
+- **Multi-Role Organization Access** — OWNER, ADMIN, and STAFF permissions with controlled access to certificates, templates, and settings
+- **Google OAuth + Email Authentication** — Login with Firebase Google Sign-In or traditional email/password flow
+- **Public Certificate Verification** — Anyone can verify a certificate using the public endpoint or QR scan without logging in
+- **Blockchain Anchoring Support** — Optional on-chain registration and verification using Polygon Amoy smart contract integration
+- **Certificate Revocation & Status Tracking** — Mark certificates as ACTIVE, REVOKED, or EXPIRED with audit provenance
+- **Analytics Dashboard** — View platform and organization stats, status breakdowns, and certificate activity trends
+- **Admin Panel for Platform Oversight** — Super admins can monitor organizations, see summaries, and suspend/unsuspend accounts
+- **Recipient Management & History** — Maintain organized recipient records and associate each cert with its issuing context
+- **Audit Logs & Verification Logs** — Track internal actions and public verification attempts for compliance and transparency
+- **Flexible Storage & Email Backends** — Switch between local, S3, Cloudinary for files and log/SMTP/Resend for email workflows
+- **Swagger API Documentation** — Explore REST endpoints and payloads interactively at `/api/docs`
+- **Dockerized Setup** — Run the entire stack locally or deploy with container-based infrastructure
 
 ---
 
 ## Features
 
-- **Certificate Issuance** — Issue professional PDF certificates individually or in bulk via CSV upload
-- **QR Code Verification** — Every certificate gets a unique QR code linking to a public verification page
-- **Tamper-Proof Records** — SHA-256 cryptographic hash of certificate data ensures records can't be silently modified
-- **Public Verification** — Anyone can verify a certificate by scanning the QR or entering the certificate ID — no account needed
-- **Certificate Templates** — Create reusable templates with custom colors, fonts, and layout options
-- **Recipient Management** — Track all recipients and their certificate history in one place
-- **Role-Based Access Control** — Owner, Admin, and Staff roles with fine-grained permissions
-- **Audit Logs** — Full audit trail of every action taken within an organization
-- **Analytics Dashboard** — Issuance trends, status breakdowns, and key metrics via charts
-- **Google OAuth** — Sign in with Google via Firebase, in addition to email/password
-- **Pluggable Storage** — Local filesystem, AWS S3, or Cloudinary — switch with a single env var
-- **Pluggable Email** — Console log (dev), SMTP, or Resend — switch with a single env var
+- **Certificate Issuance** — Professional PDF certificates for individuals or large batches via CSV upload
+- **QR Code Verification** — Every certificate generates a unique QR code that links to a public verification page
+- **Tamper-Proof Records** — SHA-256 certificate hashing protects metadata from silent modification
+- **Blockchain Verification** — Optional on-chain registration and revocation workflow using Polygon/Smart Contract support
+- **Public Verification** — Verify certificate validity by ID or QR code without creating an account
+- **Certificate Templates** — Reusable branded templates with custom colors, logos, fonts, and layout variants
+- **Recipient Management** — Track recipients, maintain unique org-level records, and view certificate history
+- **Role-Based Access Control** — Fine-grained access rules for OWNER, ADMIN, STAFF, and SUPER_ADMIN
+- **Audit Logs** — Full historical trail of organization and platform actions
+- **Analytics Dashboard** — Summary cards, charts, and insights for certificate issuance and organization health
+- **Google OAuth** — Sign in with Google via Firebase alongside standard email/password registration
+- **Organization Administration** — Edit organization profile, upload branding, manage members, and suspend organizations
+- **Admin Tools** — Platform-level stats and oversight for all organizations across the system
+- **Pluggable Storage** — Local filesystem, AWS S3, or Cloudinary
+- **Pluggable Email** — Console logging, SMTP, or Resend integration
 - **Swagger API Docs** — Interactive API documentation at `/api/docs`
 
 ---
@@ -124,10 +225,44 @@ SHA-256 Hash  ←  certId + orgId + recipientId + title + issueDate
 prisma.certificate.create()  →  PostgreSQL
     │
     ▼
+Blockhain registration (optional) → Polygon Amoy if enabled
+    │
+    ▼
 emailService.send()  →  recipient notified (non-blocking)
     │
     ▼
 201 Created  →  { certificate, pdfUrl, qrCodeUrl }
+```
+
+### Blockchain Metadata & Verification Flow
+
+The project stores a certificate hash as a tamper-evident fingerprint and, when enabled, registers it on Polygon Amoy using the `CertiChainRegistry` contract.
+
+- `certificateHash` is a SHA-256 hex string stored in PostgreSQL
+- the backend sends that hash to the smart contract for on-chain registration
+- the contract stores the hash as a keccak-based key with metadata including:
+  - `certificateId`
+  - `issuer` wallet address
+  - `timestamp`
+  - `revoked` status
+- verification checks the hash against the chain and returns:
+  - `exists`
+  - `revoked`
+  - `issuer`
+  - `timestamp`
+  - `certId`
+- the public verification endpoint exposes this in `data.blockchain`
+
+```
+Certificate PDF
+  ↓
+SHA-256 Hash
+  ↓
+Postgres record + verification metadata
+  ↓
+Polygon Amoy smart contract (optional)
+  ↓
+Public verification result with blockchain status
 ```
 
 ### Authentication Architecture
@@ -237,10 +372,24 @@ Global Role (platform-wide):
 | Docker Compose | Multi-container orchestration |
 | Supabase | Managed PostgreSQL (production) |
 | Cloudinary | Media storage (PDFs, QR codes, logos) |
+| Polygon Amoy | Blockchain testnet for certificate hash anchoring |
 | GitHub Actions | CI pipeline (`.github/workflows/ci.yml`) |
 | Swagger UI | Interactive API documentation at `/api/docs` |
 | Vitest | Unit + integration testing |
 | Supertest | HTTP endpoint testing |
+
+### Blockchain & Metadata Stack
+
+| Component | Description |
+|---|---|
+| `CertiChainRegistry.sol` | Smart contract that stores certificate hash records and revocation state |
+| `ethers.js` | Connects the backend to Polygon via JSON-RPC |
+| `Polygon Amoy` | Official testnet for deploying and validating blockchain-backed certificates |
+| `certificateHash` | SHA-256 fingerprint stored in the database and sent to the blockchain |
+| `blockchainStatus` | Enum values: `PENDING`, `CONFIRMED`, `FAILED` |
+| `blockchainTxHash` | Transaction hash for the issuance or revocation transaction |
+| `verificationUrl` | Public URL for cert lookup and validation |
+| `transaction explorer` | Links to `amoy.polygonscan.com` for viewing on-chain activity |
 
 ---
 
@@ -542,6 +691,11 @@ Copy `.env.example` to `.env` and fill in the values.
 | `FRONTEND_URL` | Frontend origin (used for CORS and email links) | `http://localhost:5173` |
 | `BACKEND_URL` | Backend URL (used for local storage file URLs) | `http://localhost:4000` |
 | `VITE_API_URL` | Frontend → backend API base URL | `http://localhost:4000/api` |
+| `BLOCKCHAIN_ENABLED` | Enables Polygon-based certificate hashing and verification | `false` |
+| `BLOCKCHAIN_RPC_URL` | Polygon Amoy RPC endpoint | `https://rpc-amoy.polygon.technology` |
+| `BLOCKCHAIN_PRIVATE_KEY` | Wallet private key for signing blockchain transactions | empty |
+| `BLOCKCHAIN_CONTRACT_ADDRESS` | Deployed contract address for `CertiChainRegistry` | empty |
+| `BLOCKCHAIN_EXPLORER_URL` | Block explorer base URL for transaction links | `https://amoy.polygonscan.com` |
 
 ### Storage — `STORAGE_PROVIDER`
 
@@ -573,6 +727,18 @@ Set to `log` (console), `smtp`, or `resend`.
 | `VITE_FIREBASE_AUTH_DOMAIN` | Same as above |
 | `VITE_FIREBASE_PROJECT_ID` | Same as above |
 | `VITE_FIREBASE_APP_ID` | Same as above |
+
+### Polygon / Blockchain Metadata
+
+| Variable | Usage |
+|---|---|
+| `BLOCKCHAIN_ENABLED` | Turns on smart contract registration and verification |
+| `BLOCKCHAIN_CHAIN_ID` | Polygon Amoy testnet chain ID is `80002` |
+| `BLOCKCHAIN_EXPLORER_URL` | Generates explorer links for tx hashes and verification metadata |
+| `VITE_BLOCKCHAIN_EXPLORER_URL` | Frontend uses it for explorer links on the verification page |
+| `certificateHash` | Used as immutable fingerprint in DB and on-chain registry |
+| `blockchainTxHash` | Stores the transaction hash from the issued or revoked certificate |
+| `blockchainStatus` | Tracks if the blockchain registration is `PENDING`, `CONFIRMED`, or `FAILED` |
 
 ### Supabase / Neon (production DB)
 
@@ -652,6 +818,38 @@ npm run lint          # Run ESLint
 ## Deployment
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment instructions including Render, Railway, Vercel, and full Docker production setup.
+
+---
+
+## Troubleshooting
+
+### Backend not starting
+
+- confirm PostgreSQL is running and `.env` contains a valid `DATABASE_URL`
+- run `npx prisma migrate deploy` inside `backend`
+- verify Node.js version is 20 or above
+
+### Firebase OAuth not working
+
+- ensure `VITE_FIREBASE_*` values are set in the frontend env
+- ensure backend `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` are valid
+- make sure the Firebase project is configured for the correct auth domain
+
+### Google login fails after deploy
+
+- add your deployed frontend/backend domains to the allowed CORS and redirect settings
+- verify that `FRONTEND_URL` matches your deployed frontend origin
+
+### Blockchain integration is disabled
+
+- set `BLOCKCHAIN_ENABLED=true`
+- ensure `BLOCKCHAIN_RPC_URL`, `BLOCKCHAIN_PRIVATE_KEY`, and `BLOCKCHAIN_CONTRACT_ADDRESS` are configured
+- confirm the wallet has funds and the contract address is correct
+
+### Verification page shows nothing
+
+- check the certificate ID format and ensure it exists in the database
+- confirm the backend is running and the `FRONTEND_URL`/`BACKEND_URL` values are correct
 
 ---
 

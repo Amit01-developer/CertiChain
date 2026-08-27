@@ -4,21 +4,26 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
-import { FileText, Plus, Trash2 } from 'lucide-react';
+import CertificatePreview from '../../components/ui/CertificatePreview';
+import { FileText, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Template } from '../../types';
 
-const fmt = (d: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(d));
+const fmt = (d: string) =>
+  new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(d));
 
 export default function Templates() {
   const { organization } = useAuth();
   const orgId = organization?.id ?? '';
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [templates,       setTemplates]       = useState<Template[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
 
   useEffect(() => {
     if (!orgId) return;
-    api.get(`/organizations/${orgId}/templates`).then(r => setTemplates(r.data.data ?? [])).finally(() => setLoading(false));
+    api.get(`/organizations/${orgId}/templates`)
+      .then(r => setTemplates(r.data.data ?? []))
+      .finally(() => setLoading(false));
   }, [orgId]);
 
   async function handleDelete(id: string, name: string) {
@@ -61,18 +66,53 @@ export default function Templates() {
               {templates.map(t => (
                 <tr key={t.id} className="border-b border-brand-border/50 hover:bg-brand-cream/50">
                   <td className="py-3 font-medium text-brand-dark">{t.name}</td>
-                  <td className="py-3 text-gray-500 capitalize">{(t.configuration as any)?.layout ?? 'landscape'}</td>
+                  <td className="py-3 text-gray-500 capitalize">
+                    {(t.configuration as any)?.layout ?? 'landscape'}
+                  </td>
                   <td className="py-3 text-gray-500 text-xs">{fmt(t.createdAt)}</td>
                   <td className="py-3">
-                    <button onClick={() => handleDelete(t.id, t.name)} className="text-gray-400 hover:text-red-500" title="Delete">
-                      <Trash2 size={15} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setPreviewTemplate(t)}
+                        className="text-gray-400 hover:text-brand-mid"
+                        title="Preview"
+                      >
+                        <Eye size={15} />
+                      </button>
+                      <Link
+                        to={`/dashboard/templates/${t.id}/edit`}
+                        className="text-gray-400 hover:text-brand-mid"
+                        title="Edit"
+                      >
+                        <Pencil size={15} />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(t.id, t.name)}
+                        className="text-gray-400 hover:text-red-500"
+                        title="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {previewTemplate && (
+        <CertificatePreview
+          config={previewTemplate.configuration}
+          orgName={organization?.name ?? 'Your Organization'}
+          orgLogoUrl={
+            (previewTemplate.configuration as any)?.showLogo !== false
+              ? (organization?.logoUrl ?? null)
+              : null
+          }
+          onClose={() => setPreviewTemplate(null)}
+        />
       )}
     </div>
   );

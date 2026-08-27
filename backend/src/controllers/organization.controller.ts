@@ -32,9 +32,18 @@ export const organizationController = {
 
   async uploadLogo(req: Request, res: Response) {
     const orgId = req.orgId!;
-    if (!req.file) return ok(res, null, 'No file uploaded.');
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
 
-    const result = await storageService.upload(req.file.buffer, `logo-${orgId}.${req.file.mimetype.split('/')[1]}`, req.file.mimetype);
+    // Derive a clean extension from the mime type (handles image/svg+xml → svg)
+    const mimeToExt: Record<string, string> = {
+      'image/jpeg':   'jpg',
+      'image/png':    'png',
+      'image/webp':   'webp',
+      'image/svg+xml': 'svg',
+    };
+    const ext = mimeToExt[req.file.mimetype] ?? req.file.mimetype.split('/')[1];
+
+    const result = await storageService.upload(req.file.buffer, `logo-${orgId}.${ext}`, req.file.mimetype);
 
     const org = await prisma.organization.update({
       where: { id: orgId },

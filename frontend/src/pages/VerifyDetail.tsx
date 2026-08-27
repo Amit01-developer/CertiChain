@@ -1,14 +1,109 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import type { VerifyResult } from '../types';
+import type { VerifyResult, BlockchainVerification } from '../types';
 import Spinner from '../components/ui/Spinner';
-import { CheckCircle, XCircle, AlertTriangle, Download, Link2, Copy } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, Download, Link2, Copy, ExternalLink, ShieldCheck, ShieldX, ShieldAlert, ShieldOff } from 'lucide-react';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
 
 const fmt = (d: string) =>
   new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(d));
+
+const fmtTs = (ts: number) =>
+  new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(ts * 1000));
+
+function BlockchainPanel({ bc }: { bc: BlockchainVerification }) {
+  if (!bc.enabled) return null;
+
+  const rows: [string, React.ReactNode][] = [];
+
+  if (bc.network)      rows.push(['Network',     bc.network]);
+  if (bc.registeredAt) rows.push(['Anchored',     fmtTs(bc.registeredAt)]);
+  if (bc.txHash)       rows.push(['Transaction',  <span className="font-mono text-xs break-all">{bc.txHash}</span>]);
+
+  let icon: React.ReactNode;
+  let label: string;
+  let sublabel: string;
+  let bannerCls: string;
+
+  switch (bc.status) {
+    case 'VERIFIED':
+      icon       = <ShieldCheck size={18} className="text-emerald-600 shrink-0" />;
+      label      = '✓ Blockchain Verified';
+      sublabel   = '✓ Hash Matched  ✓ Not Revoked  ✓ On-chain Proof';
+      bannerCls  = 'bg-emerald-50 border-emerald-200 text-emerald-800';
+      break;
+    case 'REVOKED':
+      icon       = <ShieldX size={18} className="text-red-600 shrink-0" />;
+      label      = '⚠ Revoked on Blockchain';
+      sublabel   = 'This certificate has been revoked on-chain.';
+      bannerCls  = 'bg-red-50 border-red-200 text-red-800';
+      break;
+    case 'HASH_MISMATCH':
+      icon       = <ShieldAlert size={18} className="text-red-600 shrink-0" />;
+      label      = '✗ Hash Mismatch';
+      sublabel   = '✗ Possible Tampering Detected — hash does not match on-chain record.';
+      bannerCls  = 'bg-red-50 border-red-200 text-red-800';
+      break;
+    case 'NOT_FOUND':
+      icon       = <ShieldOff size={18} className="text-amber-600 shrink-0" />;
+      label      = '⚠ Not Found on Blockchain';
+      sublabel   = 'This certificate has not been anchored on-chain yet.';
+      bannerCls  = 'bg-amber-50 border-amber-200 text-amber-800';
+      break;
+    case 'ERROR':
+      icon       = <ShieldAlert size={18} className="text-gray-400 shrink-0" />;
+      label      = 'Blockchain Unavailable';
+      sublabel   = bc.error ?? 'Could not reach the blockchain at this time.';
+      bannerCls  = 'bg-gray-50 border-gray-200 text-gray-600';
+      break;
+    default:
+      icon       = <ShieldOff size={18} className="text-gray-400 shrink-0" />;
+      label      = 'Blockchain Not Configured';
+      sublabel   = '';
+      bannerCls  = 'bg-gray-50 border-gray-200 text-gray-500';
+  }
+
+  return (
+    <div className="card mt-6">
+      <p className="overline mb-3">Blockchain Verification</p>
+
+      {/* Status banner */}
+      <div className={`flex items-start gap-2 border px-4 py-3 mb-4 ${bannerCls}`}>
+        {icon}
+        <div>
+          <p className="font-semibold text-sm">{label}</p>
+          {sublabel && <p className="text-xs mt-0.5 opacity-90">{sublabel}</p>}
+        </div>
+      </div>
+
+      {/* Detail rows */}
+      {rows.length > 0 && (
+        <div className="space-y-3">
+          {rows.map(([k, v]) => (
+            <div key={k}>
+              <p className="text-xs font-mono text-gray-400 uppercase tracking-wide">{k}</p>
+              <p className="text-sm text-brand-dark mt-0.5">{v}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* View on explorer */}
+      {bc.txUrl && (
+        <a
+          href={bc.txUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="btn-secondary flex items-center gap-2 w-full justify-center mt-4"
+        >
+          <ExternalLink size={13} /> View Transaction on Blockchain Explorer
+        </a>
+      )}
+    </div>
+  );
+}
 
 export default function VerifyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -147,6 +242,8 @@ export default function VerifyDetail() {
           </div>
         </div>
       </div>
+
+      {d.blockchain && <BlockchainPanel bc={d.blockchain} />}
 
       <p className="text-center text-xs text-gray-400 mt-8">
         Verified by CertiChain — certichain.app

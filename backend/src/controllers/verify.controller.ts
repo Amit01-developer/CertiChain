@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
+import { blockchainService } from '../services/blockchain';
+import { audit } from '../utils/auditLog';
+import { env } from '../config/env';
 import { str } from '../utils/param';
 
 export const verifyController = {
@@ -7,6 +10,7 @@ export const verifyController = {
   async verify(req: Request, res: Response) {
     const certificateId = str(req.params.certificateId);
 
+    // Fire-and-forget verification log
     prisma.verificationLog.create({
       data: {
         certificateId,
@@ -33,11 +37,79 @@ export const verifyController = {
       });
     }
 
+    // Auto-expire
     if (cert.status === 'ACTIVE' && cert.expiryDate && cert.expiryDate < new Date()) {
       await prisma.certificate.update({ where: { id: cert.id }, data: { status: 'EXPIRED' } });
       (cert as any).status = 'EXPIRED';
     }
 
+    // ── Blockchain verification ─────────────────────────────────────────────
+    let blockchainVerification: {
+      enabled:        boolean;
+      onChain:        boolean;
+      hashMatch:      boolean;
+      revoked:        boolean;
+      txHash:         string | null;
+      txUrl:          string | null;
+      network:        string | null;
+      registeredAt:   number | null;
+      status:         'VERIFIED' | 'HASH_MISMATCH' | 'NOT_FOUND' | 'REVOKED' | 'DISABLED' | 'ERROR';
+      error?:         string;
+    } = {
+      enabled:      blockchainService.isEnabled,
+      onChain:      false,
+      hashMatch:    false,
+      revoked:      false,
+      txHash:       cert.blockchainTxHash ?? null,
+      txUrl:        cert.blockchainTxHash
+                      ? `${env.BLOCKCHAIN_EXPLORER_URL}/tx/${cert.blockchainTxHash}`
+                      : null,
+      network:      cert.blockchainNetwork ?? null,
+      registeredAt: null,
+      status:       'DISABLED',
+    };
+
+    if (blockchainService.isEnabled && cert.certificateHash) {
+      const bcResult = await blockchainService.verifyCertificate(cert.certificateHash);
+
+      if (bcResult.error && !bcResult.onChain) {
+        blockchainVerification.status = 'ERROR';
+        blockchainVerification.error  = bcResult.error;
+      } else if (!bcResult.exists) {
+        blockchainVerification.status = 'NOT_FOUND';
+        blockchainVerification.onChain = bcResult.onChain;
+      } else if (bcResult.revoked) {
+        blockchainVerification.status      = 'REVOKED';
+        blockchainVerification.onChain     = true;
+        blockchainVerification.revoked     = true;
+        blockchainVerification.hashMatch   = true;
+        blockchainVerification.registeredAt = bcResult.timestamp;
+      } else {
+        // Exists, not revoked — hash matched (we queried by hash so it's always a match)
+        blockchainVerification.status      = 'VERIFIED';
+        blockchainVerification.onChain     = true;
+        blockchainVerification.hashMatch   = true;
+        blockchainVerification.registeredAt = bcResult.timestamp;
+      }
+
+      // Audit only successful on-chain verifications to avoid log spam
+      if (bcResult.exists) {
+        audit({
+          action:       'BLOCKCHAIN_VERIFIED',
+          resourceType: 'Certificate',
+          resourceId:   cert.id,
+          metadata:     {
+            certificateId,
+            onChain:   bcResult.exists,
+            hashMatch: true,
+            revoked:   bcResult.revoked,
+          },
+          ipAddress: req.ip,
+        }).catch(() => {});
+      }
+    }
+
+    // ── Build base response payload ─────────────────────────────────────────
     const base = {
       certificateId:   cert.certificateId,
       title:           cert.title,
@@ -49,6 +121,7 @@ export const verifyController = {
       verificationUrl: cert.verificationUrl,
       pdfUrl:          cert.pdfUrl,
       qrCodeUrl:       cert.qrCodeUrl,
+      blockchain:      blockchainVerification,
     };
 
     if (cert.status === 'REVOKED') {

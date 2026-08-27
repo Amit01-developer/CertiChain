@@ -1,5 +1,7 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
+import https from 'https';
+import http from 'http';
 import { env } from '../config/env';
 
 export interface CertificateData {
@@ -12,19 +14,44 @@ export interface CertificateData {
   issueDate:      Date;
   expiryDate?:    Date | null;
   organizationName: string;
+  organizationLogoUrl?: string | null;
   verificationUrl: string;
   template?: {
-    primaryColor?:  string;
-    accentColor?:   string;
-    fontFamily?:    string;
-    showLogo?:      boolean;
-    showQR?:        boolean;
+    primaryColor?:    string;
+    accentColor?:     string;
+    fontFamily?:      string;
+    showLogo?:        boolean;
+    showQR?:          boolean;
+    customImageUrl?:  string | null;
   };
+}
+
+/** Fetch a remote or local URL and return its raw buffer, or null on any error. */
+async function fetchImageBuffer(url: string): Promise<Buffer | null> {
+  try {
+    // Local file path (e.g. when STORAGE_PROVIDER=local the URL is http://localhost:…)
+    const client = url.startsWith('https') ? https : http;
+    return await new Promise<Buffer>((resolve, reject) => {
+      client.get(url, (res) => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end',  ()         => resolve(Buffer.concat(chunks)));
+        res.on('error', reject);
+      }).on('error', reject);
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function generateCertificatePdf(data: CertificateData): Promise<Buffer> {
   const primaryColor = data.template?.primaryColor ?? '#112a29';
   const accentColor  = data.template?.accentColor  ?? '#ddf05c';
+  const showLogo     = data.template?.showLogo !== false; // default true
 
   const qrDataUrl = await QRCode.toDataURL(data.verificationUrl, {
     width: 100,
@@ -32,6 +59,18 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
     color: { dark: primaryColor, light: '#ffffff' },
   });
   const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+
+  // Fetch the org logo buffer if the template wants it shown and a URL is available
+  let logoBuffer: Buffer | null = null;
+  if (showLogo && data.organizationLogoUrl) {
+    logoBuffer = await fetchImageBuffer(data.organizationLogoUrl);
+  }
+
+  // Fetch the custom template image (seal / watermark) if configured
+  let customImageBuffer: Buffer | null = null;
+  if (data.template?.customImageUrl) {
+    customImageBuffer = await fetchImageBuffer(data.template.customImageUrl);
+  }
 
   return new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -57,10 +96,36 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
     doc.rect(28, 0, W - 56, 8).fill(accentColor);
     doc.rect(28, H - 8, W - 56, 8).fill(accentColor);
 
+    // Custom template image — centred watermark/seal behind all content
+    if (customImageBuffer) {
+      try {
+        const imgSize = 140;
+        doc.save();
+        doc.opacity(0.12);
+        doc.image(customImageBuffer, (W - imgSize) / 2, (H - imgSize) / 2, {
+          width:  imgSize,
+          height: imgSize,
+          fit:    [imgSize, imgSize],
+        });
+        doc.restore();
+      } catch {
+        // malformed image — skip silently
+      }
+    }
+
     doc
       .rect(40, 20, W - 80, H - 40)
       .lineWidth(1.5)
       .stroke('#c9c1af');
+
+    // Organisation logo — top-right inside the border (only if fetched successfully)
+    if (logoBuffer) {
+      try {
+        doc.image(logoBuffer, W - 130, 28, { width: 64, height: 40, fit: [64, 40] });
+      } catch {
+        // ignore malformed logo — don't break PDF generation
+      }
+    }
 
     doc
       .font('Helvetica-Bold')
@@ -68,14 +133,25 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
       .fillColor('#637472')
       .text('OFFICIAL ACADEMIC CERTIFICATE', 0, 44, { align: 'center', characterSpacing: 2 });
 
+    // CertiChain logo mark — dark circle with accent-colour checkmark (mirrors favicon.svg)
+    const cx = W / 2, cy = 85, r = 20;
+    doc.circle(cx, cy, r).fill(primaryColor);
+    // Checkmark path scaled to fit inside the circle
+    // Points: M(cx-8, cy) L(cx-2, cy+6) L(cx+9, cy-7) — stroke in accentColor
     doc
-      .circle(W / 2, 85, 18)
-      .fillAndStroke(primaryColor, primaryColor);
+      .moveTo(cx - 8,  cy)
+      .lineTo(cx - 2,  cy + 6)
+      .lineTo(cx + 9,  cy - 7)
+      .lineWidth(2.8)
+      .lineCap('round')
+      .lineJoin('round')
+      .stroke(accentColor);
+    // "CC" wordmark below the badge
     doc
       .font('Helvetica-Bold')
-      .fontSize(16)
-      .fillColor(accentColor)
-      .text('✓', W / 2 - 6, 78);
+      .fontSize(7)
+      .fillColor(primaryColor)
+      .text('CertiChain', cx - 22, cy + r + 4, { width: 44, align: 'center', characterSpacing: 0.5 });
 
     doc
       .font('Helvetica-Bold')
