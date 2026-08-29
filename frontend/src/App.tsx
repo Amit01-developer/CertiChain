@@ -46,9 +46,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function DashboardHomeRedirect() {
+function DashboardHome() {
   const { organization } = useAuth();
-  return <Navigate to={getDashboardRouteForRole(organization?.role)} replace />;
+  const role = organization?.role;
+
+  if (role === 'STAFF') return <Navigate to="/dashboard/staff" replace />;
+  return <Dashboard />;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -79,7 +82,7 @@ function AppRoutes() {
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
 
         <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-          <Route index element={<DashboardHomeRedirect />} />
+          <Route index element={<DashboardHome />} />
           <Route path="certificates" element={<Certificates />} />
           <Route path="certificates/new" element={<NewCertificate />} />
           <Route path="certificates/bulk" element={<NewCertificate bulk />} />
