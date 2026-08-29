@@ -6,6 +6,7 @@ import prisma from '../config/prisma';
 import { env } from '../config/env';
 import { emailService } from '../services/email.service';
 import { audit } from '../utils/auditLog';
+import { logger } from '../utils/logger';
 import admin from '../config/firebase';
 import {
   ok, created, badRequest, unauthorized, conflict, notFound, serverError
@@ -47,7 +48,10 @@ export const authController = {
     });
 
     const { subject, html } = emailService.verificationEmail(name, emailToken);
-    await emailService.send({ to: email, subject, html });
+    // Fire-and-forget — never block registration on SMTP
+    emailService.send({ to: email, subject, html }).catch((e: any) =>
+      logger.warn('Verification email failed', { email, error: e?.message })
+    );
 
     await audit({ userId: user.id, organizationId: org.id, action: 'USER_REGISTERED', resourceType: 'User', resourceId: user.id, ipAddress: req.ip });
 
@@ -83,7 +87,7 @@ export const authController = {
         emailVerified: user.emailVerified,
         role:          user.role,
       },
-      organization: membership?.organization ?? null,
+      organization: membership ? { ...membership.organization, role: membership.role } : null,
     }, 'Login successful.');
   },
 
@@ -118,7 +122,10 @@ export const authController = {
     });
 
     const { subject, html } = emailService.passwordResetEmail(user.name, resetToken);
-    await emailService.send({ to: email, subject, html });
+    // Fire-and-forget
+    emailService.send({ to: email, subject, html }).catch((e: any) =>
+      logger.warn('Password reset email failed', { email, error: e?.message })
+    );
 
     await audit({ userId: user.id, action: 'PASSWORD_RESET_REQUESTED', ipAddress: req.ip });
     return ok(res, null, 'If that email exists, a reset link has been sent.');
@@ -249,7 +256,7 @@ export const authController = {
         role:          user.role,
         avatarUrl:     user.avatarUrl,
       },
-      organization: membership?.organization ?? null,
+      organization: membership ? { ...membership.organization, role: membership.role } : null,
     }, 'Login successful.');
   },
 };

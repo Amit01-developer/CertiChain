@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CheckCircle, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getDashboardRouteForRole } from '../utils/dashboardRole';
 
 const schema = z.object({
   email:    z.string().email('Valid email required'),
@@ -36,9 +37,10 @@ export default function Login() {
 
   async function onSubmit(data: Form) {
     try {
-      await login(data.email, data.password);
+      const result = await login(data.email, data.password);
+      const nextRoute = getDashboardRouteForRole(result?.organization?.role ?? undefined);
       toast.success('Welcome back!');
-      navigate('/dashboard');
+      navigate(nextRoute);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Login failed.');
     }
@@ -47,9 +49,10 @@ export default function Login() {
   async function handleGoogleLogin() {
     setGoogleLoading(true);
     try {
-      await loginWithFirebase();
+      const result = await loginWithFirebase();
+      const nextRoute = getDashboardRouteForRole(result?.organization?.role ?? undefined);
       toast.success('Welcome!');
-      navigate('/dashboard');
+      navigate(nextRoute);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Google sign-in failed.');
     } finally {

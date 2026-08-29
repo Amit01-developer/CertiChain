@@ -17,6 +17,7 @@ export const env = {
   NODE_ENV:        optional('NODE_ENV', 'development'),
   PORT:            parseInt(optional('PORT', '4000'), 10),
   DATABASE_URL:    optional('DATABASE_URL', ''),
+  DIRECT_URL:      optional('DIRECT_URL', optional('DATABASE_URL', '')),
   JWT_SECRET:      optional('JWT_SECRET', 'dev-secret-change-in-production'),
   JWT_EXPIRES_IN:  optional('JWT_EXPIRES_IN', '7d'),
   FRONTEND_URL:    optional('FRONTEND_URL', 'http://localhost:5173'),

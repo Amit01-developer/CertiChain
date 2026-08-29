@@ -121,3 +121,56 @@ export interface PaginatedResponse<T> {
   data:  { items: T[]; total: number; page: number; pages: number };
   success: boolean;
 }
+
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED';
+export type ReviewDecision   = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface OrgMember {
+  id:        string;
+  userId:    string;
+  role:      OrgMemberRole;
+  createdAt: string;
+  user: {
+    id:        string;
+    name:      string;
+    email:     string;
+    avatarUrl: string | null;
+    createdAt: string;
+  };
+}
+
+export interface PendingInvite {
+  id:        string;
+  email:     string;
+  role:      OrgMemberRole;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface CertificateReview {
+  id:            string;
+  certificateId: string;
+  reviewerId:    string;
+  decision:      ReviewDecision;
+  comment:       string | null;
+  decidedAt:     string | null;
+  createdAt:     string;
+  reviewer?: {
+    id:        string;
+    name:      string;
+    email:     string;
+    avatarUrl: string | null;
+  };
+  certificate?: Certificate & {
+    recipient: { name: string; email: string };
+    organization: { id: string; name: string };
+  };
+}
+
+export interface ReviewSummary {
+  total:    number;
+  pending:  number;
+  approved: number;
+  rejected: number;
+}
+

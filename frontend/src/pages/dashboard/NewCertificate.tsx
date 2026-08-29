@@ -52,8 +52,8 @@ export default function NewCertificate({ bulk = false }: Props) {
       const cert = res.data.data;
       setIssued({ certificateId: cert.certificateId, id: cert.id });
       toast.success(`Certificate ${cert.certificateId} issued!`);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to issue certificate.');
+    } catch {
+      // error toast already shown by api interceptor
     }
   }
 
@@ -69,8 +69,8 @@ export default function NewCertificate({ bulk = false }: Props) {
       });
       setBulkResults(res.data.data);
       toast.success(res.data.message);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Bulk import failed.');
+    } catch {
+      // error toast already shown by api interceptor
     } finally {
       setBulkLoading(false);
     }

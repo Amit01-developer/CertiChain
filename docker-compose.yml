@@ -32,6 +32,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://certichain:${POSTGRES_PASSWORD:-password}@postgres:5432/certichain
+      DIRECT_URL: postgresql://certichain:${POSTGRES_PASSWORD:-password}@postgres:5432/certichain
       NODE_ENV: production
       PORT: 4000
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required in production}

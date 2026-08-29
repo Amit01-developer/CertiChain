@@ -2,30 +2,56 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Award, FileText, Users, BarChart2,
-  ScrollText, Building2, Settings, LogOut, CheckCircle, Menu, X,
+  ScrollText, Building2, Settings, LogOut, CheckCircle, Menu,
+  ClipboardCheck, Shield, Crown, ShieldCheck,
 } from 'lucide-react';
-import { useState } from 'react';
 
-const nav = [
-  { to: '/dashboard',              icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/dashboard/certificates', icon: Award,           label: 'Certificates' },
-  { to: '/dashboard/templates',    icon: FileText,        label: 'Templates' },
-  { to: '/dashboard/recipients',   icon: Users,           label: 'Recipients' },
-  { to: '/dashboard/analytics',    icon: BarChart2,       label: 'Analytics' },
-  { to: '/dashboard/audit-logs',   icon: ScrollText,      label: 'Audit Logs' },
-  { to: '/dashboard/organization', icon: Building2,       label: 'Organization' },
-  { to: '/dashboard/settings',     icon: Settings,        label: 'Settings' },
+import { useState } from 'react';
+import type { OrgMemberRole } from '../types';
+import { getDashboardTitleForRole } from '../utils/dashboardRole';
+
+interface NavItem {
+  to:    string;
+  icon:  React.ElementType;
+  label: string;
+  roles: OrgMemberRole[];   // which roles can see this item
+}
+
+const navItems: NavItem[] = [
+  { to: '/dashboard',              icon: LayoutDashboard, label: 'Dashboard',     roles: ['OWNER', 'ADMIN', 'STAFF'] },
+  { to: '/dashboard/certificates', icon: Award,           label: 'Certificates',  roles: ['OWNER', 'ADMIN', 'STAFF'] },
+  { to: '/dashboard/reviews',      icon: ClipboardCheck,  label: 'My Reviews',    roles: ['OWNER', 'ADMIN', 'STAFF'] },
+  { to: '/dashboard/templates',    icon: FileText,        label: 'Templates',     roles: ['OWNER', 'ADMIN', 'STAFF'] },
+  { to: '/dashboard/recipients',   icon: Users,           label: 'Recipients',    roles: ['OWNER', 'ADMIN', 'STAFF'] },
+  { to: '/dashboard/members',      icon: Users,           label: 'Members',       roles: ['OWNER', 'ADMIN'] },
+  { to: '/dashboard/analytics',    icon: BarChart2,       label: 'Analytics',     roles: ['OWNER', 'ADMIN'] },
+  { to: '/dashboard/audit-logs',   icon: ScrollText,      label: 'Audit Logs',    roles: ['OWNER', 'ADMIN'] },
+  { to: '/dashboard/organization', icon: Building2,       label: 'Organization',  roles: ['OWNER', 'ADMIN'] },
+  { to: '/dashboard/settings',     icon: Settings,        label: 'Settings',      roles: ['OWNER', 'ADMIN', 'STAFF'] },
 ];
+
+const roleDisplay: Record<OrgMemberRole, { label: string; icon: React.ElementType; cls: string }> = {
+  OWNER: { label: 'Owner',  icon: Crown,       cls: 'text-purple-300' },
+  ADMIN: { label: 'Admin',  icon: ShieldCheck, cls: 'text-blue-300'   },
+  STAFF: { label: 'Staff',  icon: Shield,      cls: 'text-green-300'  },
+};
 
 export default function DashboardLayout() {
   const { user, organization, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const myRole = (organization?.role ?? 'ADMIN') as OrgMemberRole;
+  const visibleNav = navItems.filter(n => n.roles.includes(myRole));
+  const dashboardTitle = getDashboardTitleForRole(myRole);
+
   function handleLogout() {
     logout();
     navigate('/login');
   }
+
+  const roleMeta = roleDisplay[myRole];
+  const RoleIcon = roleMeta.icon;
 
   const Sidebar = () => (
     <aside className="flex flex-col h-full bg-brand-dark text-white w-60 shrink-0">
@@ -38,12 +64,15 @@ export default function DashboardLayout() {
         <div className="px-5 py-4 border-b border-white/10">
           <p className="text-xs text-white/50 mb-0.5">Organization</p>
           <p className="text-sm font-semibold truncate">{organization.name}</p>
-          <p className="text-xs text-white/40">{organization.type}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <RoleIcon size={11} className={roleMeta.cls} />
+            <p className={`text-xs font-medium ${roleMeta.cls}`}>{roleMeta.label}</p>
+          </div>
         </div>
       )}
 
       <nav className="flex-1 py-3 px-3 overflow-y-auto">
-        {nav.map(({ to, icon: Icon, label }) => (
+        {visibleNav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

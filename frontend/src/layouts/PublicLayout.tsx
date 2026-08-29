@@ -1,4 +1,4 @@
-import { Outlet, Link, NavLink } from 'react-router-dom';
+import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CheckCircle, Menu, X } from 'lucide-react';
 import { useState } from 'react';
@@ -6,6 +6,21 @@ import { useState } from 'react';
 export default function PublicLayout() {
   const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  function scrollToFeatures(e: React.MouseEvent) {
+    e.preventDefault();
+    if (location.pathname === '/') {
+      document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigate('/');
+      // After navigation, scroll once the page loads
+      setTimeout(() => {
+        document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -17,7 +32,7 @@ export default function PublicLayout() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-            <NavLink to="/#features" className="text-gray-600 hover:text-brand-dark">Features</NavLink>
+            <a href="/#features" onClick={scrollToFeatures} className="text-gray-600 hover:text-brand-dark cursor-pointer">Features</a>
             <NavLink to="/verify" className="text-gray-600 hover:text-brand-dark">Verify</NavLink>
             {user ? (
               <Link to="/dashboard" className="btn-primary">Dashboard</Link>
@@ -36,6 +51,7 @@ export default function PublicLayout() {
 
         {mobileOpen && (
           <div className="md:hidden border-t border-brand-border bg-white px-5 py-4 flex flex-col gap-3 text-sm font-medium">
+            <a href="/#features" onClick={(e) => { scrollToFeatures(e); setMobileOpen(false); }} className="text-gray-700">Features</a>
             <Link to="/verify" onClick={() => setMobileOpen(false)} className="text-gray-700">Verify Certificate</Link>
             {user ? (
               <Link to="/dashboard" onClick={() => setMobileOpen(false)} className="btn-primary text-center">Dashboard</Link>
@@ -49,7 +65,7 @@ export default function PublicLayout() {
         )}
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-hidden">
         <Outlet />
       </main>
 

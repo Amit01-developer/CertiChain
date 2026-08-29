@@ -5,10 +5,10 @@ import api from '../../services/api';
 import Spinner from '../../components/ui/Spinner';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import { Download, Copy, ExternalLink, AlertTriangle, ShieldCheck, ShieldX, ShieldAlert, ShieldOff, Loader } from 'lucide-react';
+import { Download, Copy, ExternalLink, AlertTriangle, ShieldCheck, ShieldX, ShieldAlert, ShieldOff, Loader, UserPlus, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
-import type { Certificate, BlockchainStatus } from '../../types';
+import type { Certificate, BlockchainStatus, OrgMember, CertificateReview } from '../../types';
 
 const fmt = (d: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(d));
 
@@ -96,10 +96,19 @@ function BlockchainInfoPanel({ cert }: { cert: Certificate }) {
   );
 }
 
+const decisionCls: Record<string, string> = {
+  PENDING:  'bg-amber-50 text-amber-700 border border-amber-200',
+  APPROVED: 'bg-green-50 text-green-700 border border-green-200',
+  REJECTED: 'bg-red-50   text-red-700   border border-red-200',
+};
+
 export default function CertificateDetail() {
   const { id } = useParams<{ id: string }>();
   const { organization } = useAuth();
-  const orgId = organization?.id ?? '';
+  const orgId  = organization?.id ?? '';
+  const myRole = organization?.role;
+  const isAdmin = myRole === 'OWNER' || myRole === 'ADMIN';
+
   const [cert, setCert] = useState<Certificate & { revocation?: { reason: string; revokedAt: string } } | null>(null);
   const [loading, setLoading] = useState(true);
   const [qrSrc, setQrSrc] = useState('');
@@ -107,12 +116,36 @@ export default function CertificateDetail() {
   const [revokeReason, setRevokeReason] = useState('');
   const [revoking, setRevoking] = useState(false);
 
+  // Reviews state
+  const [reviews,    setReviews]    = useState<CertificateReview[]>([]);
+  const [reviewSummary, setReviewSummary] = useState<{ total: number; pending: number; approved: number; rejected: number } | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [staffList,  setStaffList]  = useState<OrgMember[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [assigning,  setAssigning]  = useState(false);
+
   useEffect(() => {
     if (!orgId || !id) return;
     api.get(`/organizations/${orgId}/certificates/${id}`)
       .then(r => setCert(r.data.data))
       .finally(() => setLoading(false));
+
+    // Load reviews
+    api.get(`/organizations/${orgId}/certificates/${id}/reviews`)
+      .then(r => {
+        setReviews(r.data.data.reviews ?? []);
+        setReviewSummary(r.data.data.summary ?? null);
+      })
+      .catch(() => {}); // reviews section is optional
   }, [orgId, id]);
+
+  // Load staff members when assign modal opens
+  useEffect(() => {
+    if (!assignOpen || !orgId) return;
+    api.get(`/organizations/${orgId}/members`)
+      .then(r => setStaffList((r.data.data.members ?? []).filter((m: OrgMember) => m.role === 'STAFF')))
+      .catch(() => {});
+  }, [assignOpen, orgId]);
 
   useEffect(() => {
     if (cert?.verificationUrl) {
@@ -131,6 +164,25 @@ export default function CertificateDetail() {
     } catch {
       toast.error('Failed to revoke.');
     } finally { setRevoking(false); }
+  }
+
+  async function handleAssignReviewers() {
+    if (selectedIds.length === 0) { toast.error('Select at least one reviewer.'); return; }
+    setAssigning(true);
+    try {
+      const r = await api.post(`/organizations/${orgId}/certificates/${id}/reviews`, { reviewerIds: selectedIds });
+      toast.success(r.data.message ?? 'Reviewers assigned.');
+      setAssignOpen(false);
+      setSelectedIds([]);
+      // Reload reviews
+      const rv = await api.get(`/organizations/${orgId}/certificates/${id}/reviews`);
+      setReviews(rv.data.data.reviews ?? []);
+      setReviewSummary(rv.data.data.summary ?? null);
+    } finally { setAssigning(false); }
+  }
+
+  function toggleReviewer(userId: string) {
+    setSelectedIds(prev => prev.includes(userId) ? prev.filter(i => i !== userId) : [...prev, userId]);
   }
 
   function copyLink() {
@@ -202,14 +254,69 @@ export default function CertificateDetail() {
             <a href={cert.verificationUrl} target="_blank" rel="noreferrer" className="btn-secondary flex items-center gap-2 w-full justify-center">
               <ExternalLink size={14} /> Open Public Page
             </a>
-            {cert.status === 'ACTIVE' && (
+            {/* Revoke: admin/owner only */}
+            {isAdmin && cert.status === 'ACTIVE' && (
               <button onClick={() => setRevokeOpen(true)} className="btn-danger flex items-center gap-2 w-full justify-center">
                 <AlertTriangle size={14} /> Revoke Certificate
+              </button>
+            )}
+            {/* Assign reviewers: admin/owner only */}
+            {isAdmin && (
+              <button onClick={() => setAssignOpen(true)} className="btn-secondary flex items-center gap-2 w-full justify-center">
+                <UserPlus size={14} /> Assign Reviewers
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Reviews panel */}
+      {(reviews.length > 0 || isAdmin) && (
+        <div className="card mb-5">
+          <p className="overline mb-3">Multi-Party Review</p>
+
+          {reviewSummary && reviewSummary.total > 0 && (
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              {[
+                { label: 'Pending',  value: reviewSummary.pending,  cls: 'text-amber-600' },
+                { label: 'Approved', value: reviewSummary.approved, cls: 'text-green-600' },
+                { label: 'Rejected', value: reviewSummary.rejected, cls: 'text-red-600'   },
+              ].map(({ label, value, cls }) => (
+                <div key={label} className="bg-brand-cream border border-brand-border px-3 py-2 text-center">
+                  <p className={`text-lg font-bold ${cls}`}>{value}</p>
+                  <p className="text-xs text-gray-500">{label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {reviews.length === 0 ? (
+            <p className="text-sm text-gray-400 py-2">No reviewers assigned yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {reviews.map(rv => (
+                <div key={rv.id} className="flex items-center justify-between text-sm py-2 border-b border-brand-border/50 last:border-0">
+                  <div>
+                    <p className="font-medium text-brand-dark">{rv.reviewer?.name ?? rv.reviewerId}</p>
+                    <p className="text-xs text-gray-400">{rv.reviewer?.email}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-xs font-medium px-2 py-0.5 ${decisionCls[rv.decision]}`}>
+                      {rv.decision}
+                    </span>
+                    {rv.comment && (
+                      <p className="text-xs text-gray-500 max-w-[200px] text-right">{rv.comment}</p>
+                    )}
+                    {rv.decidedAt && (
+                      <p className="text-xs text-gray-400">{fmt(rv.decidedAt)}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <Modal open={revokeOpen} onClose={() => setRevokeOpen(false)} title="Revoke Certificate">
         <div className="space-y-4">
@@ -230,6 +337,61 @@ export default function CertificateDetail() {
               {revoking ? 'Revoking…' : 'Confirm Revoke'}
             </button>
             <button onClick={() => setRevokeOpen(false)} className="btn-secondary px-6 py-2.5">Cancel</button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={assignOpen} onClose={() => { setAssignOpen(false); setSelectedIds([]); }} title="Assign Reviewers">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Select staff members to review this certificate. Each reviewer will see it in their review tasks.
+          </p>
+          {staffList.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">
+              No staff members in your organization yet.{' '}
+              <a href="/dashboard/members" className="text-brand-mid underline">Add staff first.</a>
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {staffList.map(m => {
+                const alreadyAssigned = reviews.some(r => r.reviewerId === m.userId);
+                return (
+                  <label
+                    key={m.id}
+                    className={`flex items-center gap-3 p-3 border cursor-pointer transition-colors ${
+                      selectedIds.includes(m.userId)
+                        ? 'border-brand-mid bg-brand-cream'
+                        : alreadyAssigned
+                        ? 'border-brand-border bg-gray-50 opacity-60'
+                        : 'border-brand-border hover:bg-brand-cream/50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(m.userId)}
+                      onChange={() => !alreadyAssigned && toggleReviewer(m.userId)}
+                      disabled={alreadyAssigned}
+                      className="accent-brand-dark"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-brand-dark">{m.user.name}</p>
+                      <p className="text-xs text-gray-400">{m.user.email}</p>
+                    </div>
+                    {alreadyAssigned && (
+                      <span className="ml-auto text-xs text-gray-400">Already assigned</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button onClick={handleAssignReviewers} disabled={assigning || selectedIds.length === 0} className="btn-primary flex-1 py-2.5">
+              {assigning ? 'Assigning…' : `Assign ${selectedIds.length > 0 ? `(${selectedIds.length})` : ''}`}
+            </button>
+            <button onClick={() => { setAssignOpen(false); setSelectedIds([]); }} className="btn-secondary px-5 py-2.5">
+              Cancel
+            </button>
           </div>
         </div>
       </Modal>

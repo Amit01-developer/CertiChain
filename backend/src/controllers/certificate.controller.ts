@@ -151,6 +151,7 @@ export const certificateController = {
   },
 
   async create(req: Request, res: Response) {
+    try {
     const orgId = req.orgId!;
     const {
       recipientName, recipientEmail, title, description, achievement,
@@ -215,22 +216,24 @@ export const certificateController = {
 
     registerOnBlockchain(cert.id, certId, certHash, orgId, req.user!.userId, req.ip).catch(() => {});
 
+    // Fire-and-forget email — never block the response on SMTP
     if (sendEmail) {
-      try {
-        const org = await prisma.organization.findUnique({ where: { id: orgId } });
-        await emailService.send(
+      prisma.organization.findUnique({ where: { id: orgId } })
+        .then(org => emailService.send(
           emailService.certificateIssuedEmail(
             recipientName, recipientEmail, certId, title, org?.name ?? 'CertiChain', verificationUrl
           )
-        );
-      } catch (emailErr: any) {
-        logger.warn('Certificate issued but notification email failed', {
+        ))
+        .catch((emailErr: any) => logger.warn('Certificate email failed', {
           certId, recipientEmail, error: emailErr?.message,
-        });
-      }
+        }));
     }
 
     return created(res, cert, `Certificate ${certId} issued successfully.`);
+    } catch (err: any) {
+      logger.error('Certificate create error', { error: err?.message, stack: err?.stack });
+      return serverError(res, err?.message || 'Failed to issue certificate.');
+    }
   },
 
   async getById(req: Request, res: Response) {

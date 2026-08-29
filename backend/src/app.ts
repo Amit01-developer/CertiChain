@@ -18,6 +18,8 @@ import templateRoutes    from './routes/template.routes';
 import recipientRoutes   from './routes/recipient.routes';
 import verifyRoutes      from './routes/verify.routes';
 import adminRoutes       from './routes/admin.routes';
+import { publicInvitationRouter } from './routes/invitation.routes';
+import { certReviewRouter, orgReviewRouter } from './routes/review.routes';
 
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
@@ -80,12 +82,15 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
   customSiteTitle: 'CertiChain API Docs',
 }));
 
-app.use('/api/auth',       authRoutes);
-app.use('/api/verify',     verifyRoutes);
-app.use('/api/admin',      adminRoutes);
+app.use('/api/auth',            authRoutes);
+app.use('/api/verify',          verifyRoutes);
+app.use('/api/admin',           adminRoutes);
+app.use('/api/invitations',     publicInvitationRouter);
 
 app.use('/api/organizations/:orgId',              orgRoutes);
+app.use('/api/organizations/:orgId',              orgReviewRouter);
 app.use('/api/organizations/:orgId/certificates', certRoutes);
+app.use('/api/organizations/:orgId/certificates/:certId', certReviewRouter);
 app.use('/api/organizations/:orgId/templates',    templateRoutes);
 app.use('/api/organizations/:orgId/recipients',   recipientRoutes);
 

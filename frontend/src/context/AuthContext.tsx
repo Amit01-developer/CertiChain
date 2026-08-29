@@ -12,9 +12,9 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login:              (email: string, password: string) => Promise<void>;
+  login:              (email: string, password: string) => Promise<{ user: User; organization: Organization | null; token: string } | void>;
   loginWithToken:     (token: string) => Promise<void>;
-  loginWithFirebase:  () => Promise<void>;
+  loginWithFirebase:  () => Promise<{ user: User; organization: Organization | null; token: string } | void>;
   logout:             () => void;
   setOrg:             (org: Organization) => void;
   refreshMe:          () => Promise<void>;
@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { token, user, organization } = res.data.data;
     localStorage.setItem('cc_token', token);
     setState({ user, organization, token, loading: false });
+    return res.data.data;
   }
 
   async function loginWithToken(token: string) {
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { token, user, organization } = res.data.data;
     localStorage.setItem('cc_token', token);
     setState({ user, organization, token, loading: false });
+    return res.data.data;
   }
 
   function logout() {

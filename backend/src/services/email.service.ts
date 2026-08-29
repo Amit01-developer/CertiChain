@@ -105,6 +105,60 @@ export class EmailService {
       `,
     };
   }
+
+  /**
+   * Sent when an existing user is directly added as staff (no invitation link needed).
+   */
+  staffAddedEmail(name: string, email: string, orgName: string, dashboardUrl: string): SendOptions {
+    return {
+      to:      email,
+      subject: `You have been added as a Staff Member of ${orgName} on CertiChain`,
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <h2 style="color:#112a29;">Welcome to ${orgName}, ${name}!</h2>
+          <p>You have been added as a <strong>Staff Member</strong> of <strong>${orgName}</strong> on CertiChain.</p>
+          <p>As a staff member you can:</p>
+          <ul>
+            <li>Issue certificates on behalf of ${orgName}</li>
+            <li>View certificate records</li>
+            <li>Participate in certificate review/verification tasks</li>
+          </ul>
+          <a href="${dashboardUrl}" style="background:#112a29;color:#ddf05c;padding:12px 24px;text-decoration:none;border-radius:4px;display:inline-block;margin:16px 0;">
+            Go to Dashboard
+          </a>
+          <p style="color:#666;font-size:13px;">If you have any questions, contact your organization administrator.</p>
+        </div>
+      `,
+    };
+  }
+
+  /**
+   * Sent to a new (unregistered) user who has been invited as staff.
+   */
+  staffInvitationEmail(email: string, orgName: string, inviteUrl: string): SendOptions {
+    return {
+      to:      email,
+      subject: `You have been invited as a Staff Member of ${orgName} on CertiChain`,
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <h2 style="color:#112a29;">You've been invited to join ${orgName}</h2>
+          <p>You have been invited to join <strong>${orgName}</strong> as a <strong>Staff Member</strong> on CertiChain — a blockchain-backed digital certificate platform.</p>
+          <p>As a staff member you will be able to:</p>
+          <ul>
+            <li>Issue digital certificates on behalf of ${orgName}</li>
+            <li>View and manage certificate records</li>
+            <li>Participate in certificate review and verification tasks</li>
+          </ul>
+          <p><strong>To accept this invitation, click the button below:</strong></p>
+          <a href="${inviteUrl}" style="background:#112a29;color:#ddf05c;padding:12px 24px;text-decoration:none;border-radius:4px;display:inline-block;margin:16px 0;">
+            Accept Invitation
+          </a>
+          <p>Or copy this link:<br/><small style="color:#666;word-break:break-all;">${inviteUrl}</small></p>
+          <p style="color:#888;font-size:12px;">This invitation expires in 72 hours. If you did not expect this email, you can safely ignore it.</p>
+        </div>
+      `,
+    };
+  }
 }
 
 export const emailService = new EmailService();

@@ -16,12 +16,19 @@ export const templateController = {
   },
 
   async create(req: Request, res: Response) {
-    const { name, configuration } = req.body;
-    const template = await prisma.certificateTemplate.create({
-      data: { organizationId: req.orgId!, name, configuration },
-    });
-    await audit({ userId: req.user!.userId, organizationId: req.orgId!, action: 'TEMPLATE_CREATED', resourceType: 'Template', resourceId: template.id });
-    return created(res, template, 'Template created.');
+    try {
+      const { name, configuration } = req.body;
+      if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, message: 'Template name is required.' });
+      }
+      const template = await prisma.certificateTemplate.create({
+        data: { organizationId: req.orgId!, name: name.trim(), configuration: configuration ?? {} },
+      });
+      await audit({ userId: req.user!.userId, organizationId: req.orgId!, action: 'TEMPLATE_CREATED', resourceType: 'Template', resourceId: template.id });
+      return created(res, template, 'Template created.');
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || 'Failed to create template.' });
+    }
   },
 
   async getById(req: Request, res: Response) {

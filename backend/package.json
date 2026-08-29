@@ -16,6 +16,7 @@
     "studio": "prisma studio"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1121.0",
     "@prisma/client": "^5.22.0",
     "@types/swagger-ui-express": "^4.1.8",
     "bcryptjs": "^2.4.3",
@@ -35,6 +36,7 @@
     "nodemailer": "^6.9.16",
     "pdfkit": "^0.15.1",
     "qrcode": "^1.5.4",
+    "resend": "^6.25.0",
     "sharp": "^0.33.5",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^10.0.0",

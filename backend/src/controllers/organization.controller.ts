@@ -53,12 +53,13 @@ export const organizationController = {
     return ok(res, { logoUrl: result.url }, 'Logo updated.');
   },
 
+  /** Legacy: add an existing registered user directly (kept for backward compat). */
   async addMember(req: Request, res: Response) {
     const orgId            = req.orgId!;
     const { email, role }  = req.body;
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return notFound(res, 'No user found with that email. They must register first.');
+    if (!user) return notFound(res, 'No user found with that email. Use the invitation flow to invite new users.');
 
     const existing = await prisma.orgMember.findUnique({
       where: { organizationId_userId: { organizationId: orgId, userId: user.id } },
@@ -90,9 +91,9 @@ export const organizationController = {
     const orgId = req.orgId!;
 
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfMonth  = new Date(now.getFullYear(), now.getMonth(), 1);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const sixMonthsAgo  = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
     const [total, active, revoked, totalRecipients, thisMonth, verifications, rawCerts] = await Promise.all([
       prisma.certificate.count({ where: { organizationId: orgId } }),
@@ -106,8 +107,8 @@ export const organizationController = {
         where: { createdAt: { gte: thirtyDaysAgo } },
       }),
       prisma.certificate.findMany({
-        where:  { organizationId: orgId, createdAt: { gte: sixMonthsAgo } },
-        select: { createdAt: true },
+        where:   { organizationId: orgId, createdAt: { gte: sixMonthsAgo } },
+        select:  { createdAt: true },
         orderBy: { createdAt: 'asc' },
       }),
     ]);
@@ -142,5 +143,51 @@ export const organizationController = {
     ]);
 
     return ok(res, { logs, total, page, pages: Math.ceil(total / limit) });
+  },
+
+  async getStaffDashboard(req: Request, res: Response) {
+    const orgId  = req.orgId!;
+    const userId = req.user!.userId;
+
+    const [org, recentCerts, pendingReviews, issuedByMeCount] = await Promise.all([
+      prisma.organization.findUnique({
+        where:  { id: orgId },
+        select: { id: true, name: true, type: true, logoUrl: true },
+      }),
+      prisma.certificate.findMany({
+        where:   { organizationId: orgId },
+        include: { recipient: { select: { name: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take:    10,
+      }),
+      prisma.certificateReview.findMany({
+        where: {
+          reviewerId:  userId,
+          decision:    'PENDING',
+          certificate: { organizationId: orgId },
+        },
+        include: {
+          certificate: {
+            include: { recipient: { select: { name: true, email: true } } },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.certificate.count({
+        where: { organizationId: orgId, issuedById: userId },
+      }),
+    ]);
+
+    const member = await prisma.orgMember.findUnique({
+      where: { organizationId_userId: { organizationId: orgId, userId } },
+    });
+
+    return ok(res, {
+      organization:    org,
+      role:            member?.role ?? 'STAFF',
+      issuedByMe:      issuedByMeCount,
+      recentCerts,
+      pendingReviews,
+    });
   },
 };

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -30,6 +31,18 @@ enum BlockchainStatus {
   FAILED
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+enum ReviewDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id             String   @id @default(uuid())
   name           String
@@ -48,6 +61,7 @@ model User {
 
   memberships    OrgMember[]
   auditLogs      AuditLog[]
+  reviews        CertificateReview[]
 
   @@index([email])
 }
@@ -71,6 +85,7 @@ model Organization {
   certificates Certificate[]
   recipients   Recipient[]
   auditLogs    AuditLog[]
+  invitations  StaffInvitation[]
 }
 
 model OrgMember {
@@ -151,6 +166,7 @@ model Certificate {
   template        CertificateTemplate?  @relation(fields: [templateId], references: [id])
   recipient       Recipient             @relation(fields: [recipientId], references: [id])
   revocation      Revocation?
+  reviews         CertificateReview[]
 
   @@index([certificateId])
   @@index([organizationId])
@@ -197,4 +213,42 @@ model VerificationLog {
 
   @@index([certificateId])
   @@index([createdAt])
+}
+
+model StaffInvitation {
+  id             String           @id @default(uuid())
+  organizationId String
+  email          String
+  tokenHash      String           @unique
+  role           OrgMemberRole    @default(STAFF)
+  status         InvitationStatus @default(PENDING)
+  invitedById    String?
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Allow only one pending invitation per email per org
+  @@unique([organizationId, email])
+  @@index([tokenHash])
+  @@index([organizationId])
+}
+
+model CertificateReview {
+  id            String         @id @default(uuid())
+  certificateId String
+  reviewerId    String
+  decision      ReviewDecision @default(PENDING)
+  comment       String?
+  decidedAt     DateTime?
+  createdAt     DateTime       @default(now())
+
+  certificate   Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  reviewer      User        @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@unique([certificateId, reviewerId])
+  @@index([certificateId])
+  @@index([reviewerId])
+  @@index([decision])
 }
