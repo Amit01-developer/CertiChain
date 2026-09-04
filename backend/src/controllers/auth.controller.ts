@@ -226,22 +226,34 @@ export const authController = {
           },
         });
 
-        await prisma.organization.create({
-          data: {
-            name:    `${user.name}'s Organization`,
-            type:    'Other',
-            email,
-            members: { create: { userId: user.id, role: 'OWNER' } },
-          },
+        // Only create a personal org if they have NO existing memberships
+        // (e.g. they were NOT already added as staff via invitation)
+        const existingMembership = await prisma.orgMember.findFirst({
+          where: { userId: user.id },
         });
+
+        if (!existingMembership) {
+          await prisma.organization.create({
+            data: {
+              name:    `${user.name}'s Organization`,
+              type:    'Other',
+              email,
+              members: { create: { userId: user.id, role: 'OWNER' } },
+            },
+          });
+        }
       }
     }
 
-    const membership = await prisma.orgMember.findFirst({
+    // Pick membership — if user was invited to someone's org as STAFF/ADMIN, prefer that over their own personal OWNER org
+    const memberships = await prisma.orgMember.findMany({
       where:   { userId: user.id },
       include: { organization: true },
       orderBy: { createdAt: 'asc' },
     });
+    const membership = memberships.length > 1
+      ? (memberships.find(m => m.role === 'STAFF' || m.role === 'ADMIN') ?? memberships[0])
+      : (memberships[0] ?? null);
 
     const token = signToken(user.id, user.email, user.role);
     await audit({ userId: user.id, organizationId: membership?.organizationId, action: 'USER_LOGIN_GOOGLE', ipAddress: req.ip });

@@ -109,6 +109,28 @@ async function main() {
     console.log('✓ Created certificate:', cert.certificateId);
   }
 
+  // ── Staff demo user ────────────────────────────────────────────────────────
+  const staffHash = await bcrypt.hash('Staff@1234', 12);
+  const staffUser = await prisma.user.upsert({
+    where:  { email: 'staff@certichain.demo' },
+    update: {},
+    create: {
+      name:          'Staff User',
+      email:         'staff@certichain.demo',
+      passwordHash:  staffHash,
+      emailVerified: true,
+    },
+  });
+  console.log('✓ Created staff user:', staffUser.email);
+
+  // Add staff user to the demo org as STAFF (if not already a member)
+  await prisma.orgMember.upsert({
+    where: { organizationId_userId: { organizationId: org.id, userId: staffUser.id } },
+    update: {},
+    create: { organizationId: org.id, userId: staffUser.id, role: 'STAFF' },
+  });
+  console.log('✓ Added staff user to:', org.name);
+
   // Revoked demo certificate
   const revokedId = 'CC-2026-REVOKED';
   const existingRevoked = await prisma.certificate.findUnique({ where: { certificateId: revokedId } });
@@ -137,8 +159,8 @@ async function main() {
 
   console.log('\n✅ Seed complete.');
   console.log('\nDemo credentials:');
-  console.log('  Email:    admin@certichain.demo');
-  console.log('  Password: Demo@1234');
+  console.log('  Admin  →  admin@certichain.demo  /  Demo@1234');
+  console.log('  Staff  →  staff@certichain.demo  /  Staff@1234');
   console.log('\nDemo certificate IDs:');
   console.log('  Active:  CC-2026-DEMO01');
   console.log('  Revoked: CC-2026-REVOKED');

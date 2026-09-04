@@ -25,12 +25,23 @@ export class EmailService {
   }
 
   private async sendSmtp(opts: SendOptions): Promise<void> {
+    if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
+      logger.warn('[EMAIL] SMTP is enabled but missing SMTP_HOST / SMTP_USER / SMTP_PASS. Falling back to log mode.');
+      return this.logEmail(opts);
+    }
+
     const nodemailer = await import('nodemailer');
     const transport = nodemailer.default.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE,
+      requireTLS: env.SMTP_REQUIRE_TLS,
+      tls: { rejectUnauthorized: env.SMTP_TLS_REJECT_UNAUTHORIZED },
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+      connectionTimeout: 20000,
+      greetingTimeout: 15000,
     });
+
     await transport.sendMail({
       from:    `"${env.EMAIL_FROM_NAME}" <${env.EMAIL_FROM}>`,
       to:      opts.to,

@@ -53,6 +53,38 @@ class BlockchainService {
     }
   }
 
+  private async assertCorrectNetwork(): Promise<void> {
+    if (!this.provider || !this.signer || !this.contract) {
+      throw new Error('Blockchain client is not initialized.');
+    }
+
+    const network = await this.provider.getNetwork();
+    const chainId = Number(network.chainId);
+
+    if (chainId !== env.BLOCKCHAIN_CHAIN_ID) {
+      throw new Error(
+        `Blockchain network mismatch. Expected Polygon Amoy (chainId ${env.BLOCKCHAIN_CHAIN_ID}) but connected to chainId ${chainId}.`
+      );
+    }
+
+    // Authorization check is best-effort — if the contract doesn't expose
+    // owner()/authorizedIssuers() or the call reverts, we let the tx attempt
+    // proceed and surface any real auth failure from the transaction itself.
+    try {
+      const owner = await (this.contract as any).owner?.().catch(() => null);
+      const isAuthorized = await (this.contract as any).authorizedIssuers?.(this.signer.address).catch(() => true);
+
+      if (owner && owner.toLowerCase() !== this.signer.address.toLowerCase() && !isAuthorized) {
+        logger.warn(
+          `[Blockchain] Wallet ${this.signer.address} may not be authorized — attempting registration anyway.`
+        );
+      }
+    } catch {
+      // Authorization check failed; proceed and let the transaction surface the real error.
+      logger.warn('[Blockchain] Could not verify wallet authorization — proceeding with registration attempt.');
+    }
+  }
+
   get isEnabled(): boolean {
     return env.BLOCKCHAIN_ENABLED &&
       !!env.BLOCKCHAIN_RPC_URL &&
@@ -66,6 +98,7 @@ class BlockchainService {
     }
 
     try {
+      await this.assertCorrectNetwork();
       logger.info('[Blockchain] Registering certificate', { certificateId });
 
       const tx = await (this.contract as any).registerCertificate(certificateId, certHashHex);
@@ -122,6 +155,7 @@ class BlockchainService {
     }
 
     try {
+      await this.assertCorrectNetwork();
       logger.info('[Blockchain] Revoking certificate', { certHashHex: certHashHex.slice(0, 12) + '…' });
 
       const tx = await (this.contract as any).revokeCertificate(certHashHex);

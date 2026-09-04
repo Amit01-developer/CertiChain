@@ -3,6 +3,14 @@ import path from 'path';
 
 config({ path: path.resolve(__dirname, '../../../.env') });
 
+export function sanitizeCredential(value?: string): string {
+  return (value ?? '').replace(/\s+/g, '').trim();
+}
+
+export function normalizeBaseUrl(value?: string): string {
+  return (value ?? '').trim().replace(/\/+$/, '');
+}
+
 function required(key: string): string {
   const val = process.env[key];
   if (!val) throw new Error(`Missing required env var: ${key}`);
@@ -13,6 +21,25 @@ function optional(key: string, fallback = ''): string {
   return process.env[key] ?? fallback;
 }
 
+export function resolveEmailProvider(emailProvider?: string, smtpHost?: string): 'smtp' | 'resend' | 'sendgrid' | 'log' {
+  const configured = (emailProvider ?? '').trim().toLowerCase();
+  if (configured === 'smtp' || configured === 'resend' || configured === 'sendgrid' || configured === 'log') {
+    return configured as 'smtp' | 'resend' | 'sendgrid' | 'log';
+  }
+
+  return smtpHost ? 'smtp' : 'log';
+}
+
+export function resolveSmtpSecure(port: number, configuredValue?: string): boolean {
+  if (configuredValue !== undefined && configuredValue !== null && configuredValue !== '') {
+    return configuredValue.toLowerCase() === 'true';
+  }
+
+  return port === 465;
+}
+
+const smtpPort = parseInt(optional('SMTP_PORT', '587'), 10);
+
 export const env = {
   NODE_ENV:        optional('NODE_ENV', 'development'),
   PORT:            parseInt(optional('PORT', '4000'), 10),
@@ -20,8 +47,8 @@ export const env = {
   DIRECT_URL:      optional('DIRECT_URL', optional('DATABASE_URL', '')),
   JWT_SECRET:      optional('JWT_SECRET', 'dev-secret-change-in-production'),
   JWT_EXPIRES_IN:  optional('JWT_EXPIRES_IN', '7d'),
-  FRONTEND_URL:    optional('FRONTEND_URL', 'http://localhost:5173'),
-  BACKEND_URL:     optional('BACKEND_URL', 'http://localhost:4000'),
+  FRONTEND_URL:    normalizeBaseUrl(optional('FRONTEND_URL', 'http://localhost:5173')),
+  BACKEND_URL:     normalizeBaseUrl(optional('BACKEND_URL', 'http://localhost:4000')),
 
   STORAGE_PROVIDER:  optional('STORAGE_PROVIDER', 'local') as 'local' | 's3' | 'cloudinary',
   STORAGE_LOCAL_DIR: optional('STORAGE_LOCAL_DIR', './uploads'),
@@ -30,14 +57,17 @@ export const env = {
   AWS_SECRET_KEY:    optional('AWS_SECRET_ACCESS_KEY'),
   AWS_S3_BUCKET:     optional('AWS_S3_BUCKET'),
 
-  EMAIL_PROVIDER:  optional('EMAIL_PROVIDER', 'log') as 'smtp' | 'resend' | 'sendgrid' | 'log',
-  EMAIL_FROM:      optional('EMAIL_FROM', 'noreply@certichain.com'),
-  EMAIL_FROM_NAME: optional('EMAIL_FROM_NAME', 'CertiChain'),
-  SMTP_HOST:       optional('SMTP_HOST'),
-  SMTP_PORT:       parseInt(optional('SMTP_PORT', '587'), 10),
-  SMTP_USER:       optional('SMTP_USER'),
-  SMTP_PASS:       optional('SMTP_PASS'),
-  RESEND_API_KEY:  optional('RESEND_API_KEY'),
+  EMAIL_PROVIDER:  resolveEmailProvider(optional('EMAIL_PROVIDER'), optional('SMTP_HOST')) as 'smtp' | 'resend' | 'sendgrid' | 'log',
+  EMAIL_FROM:      optional('EMAIL_FROM', 'noreply@certichain.com').trim(),
+  EMAIL_FROM_NAME: optional('EMAIL_FROM_NAME', 'CertiChain').trim(),
+  SMTP_HOST:       optional('SMTP_HOST').trim(),
+  SMTP_PORT:       smtpPort,
+  SMTP_SECURE:     resolveSmtpSecure(smtpPort, optional('SMTP_SECURE')),
+  SMTP_REQUIRE_TLS: optional('SMTP_REQUIRE_TLS', 'true').toLowerCase() !== 'false',
+  SMTP_TLS_REJECT_UNAUTHORIZED: optional('SMTP_TLS_REJECT_UNAUTHORIZED', 'true').toLowerCase() !== 'false',
+  SMTP_USER:       optional('SMTP_USER').trim(),
+  SMTP_PASS:       sanitizeCredential(optional('SMTP_PASS')),
+  RESEND_API_KEY:  sanitizeCredential(optional('RESEND_API_KEY')),
 
   RATE_LIMIT_WINDOW_MS:  parseInt(optional('RATE_LIMIT_WINDOW_MS', '900000'), 10),
   RATE_LIMIT_MAX:        parseInt(optional('RATE_LIMIT_MAX', '100'), 10),

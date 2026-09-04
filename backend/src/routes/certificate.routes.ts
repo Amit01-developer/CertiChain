@@ -36,6 +36,11 @@ router.post('/:id/revoke',
   certificateController.revoke
 );
 
+router.post('/:id/blockchain-retry',
+  requireOrgRole('ADMIN', 'OWNER'),
+  certificateController.blockchainRetry
+);
+
 router.get('/:id/download', requireOrgRole('STAFF', 'ADMIN', 'OWNER'), certificateController.downloadPdf);
 
 export default router;

@@ -27,9 +27,11 @@ function BlockchainStatusBadge({ status }: { status: BlockchainStatus | null | u
   );
 }
 
-function BlockchainInfoPanel({ cert }: { cert: Certificate }) {
+function BlockchainInfoPanel({ cert, orgId, onRetrySuccess }: { cert: Certificate; orgId: string; onRetrySuccess: (updated: Partial<Certificate>) => void }) {
   const { blockchainStatus, blockchainTxHash, blockchainNetwork, blockchainHash } = cert;
   if (!blockchainStatus) return null;
+
+  const [retrying, setRetrying] = useState(false);
 
   const explorerBase = import.meta.env.VITE_BLOCKCHAIN_EXPLORER_URL || 'https://amoy.polygonscan.com';
   const txUrl = blockchainTxHash ? `${explorerBase}/tx/${blockchainTxHash}` : null;
@@ -54,6 +56,20 @@ function BlockchainInfoPanel({ cert }: { cert: Certificate }) {
 
   const cfg = statusConfig[blockchainStatus];
 
+  async function handleRetry() {
+    setRetrying(true);
+    try {
+      const r = await api.post(`/organizations/${orgId}/certificates/${cert.id}/blockchain-retry`);
+      const updated = r.data.data ?? {};
+      onRetrySuccess(updated);
+      toast.success('Blockchain registration queued — status will update shortly.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Retry failed. Please try again.');
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   return (
     <div className="card mb-5">
       <p className="overline mb-3">Blockchain</p>
@@ -62,6 +78,19 @@ function BlockchainInfoPanel({ cert }: { cert: Certificate }) {
         {cfg.icon}
         <p className="text-sm font-semibold">{cfg.heading}</p>
       </div>
+
+      {blockchainStatus === 'FAILED' && (
+        <div className="bg-red-50 border border-red-100 px-4 py-3 mb-4 text-sm text-red-700">
+          <p className="font-medium mb-1">Why did this happen?</p>
+          <ul className="list-disc list-inside space-y-1 text-xs">
+            <li>RPC endpoint was unreachable at issuance time</li>
+            <li>Wallet was not authorised on the smart contract</li>
+            <li>Insufficient MATIC for gas fees</li>
+            <li>Chain ID mismatch (expected Polygon Amoy 80002)</li>
+          </ul>
+          <p className="text-xs mt-2 text-red-500">The certificate itself is valid — only the on-chain anchor failed.</p>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
         <div>
@@ -91,6 +120,16 @@ function BlockchainInfoPanel({ cert }: { cert: Certificate }) {
         >
           <ExternalLink size={13} /> View on Blockchain Explorer
         </a>
+      )}
+
+      {blockchainStatus === 'FAILED' && (
+        <button
+          onClick={handleRetry}
+          disabled={retrying}
+          className="btn-secondary flex items-center gap-2 w-full justify-center mt-3 border-red-200 text-red-700 hover:bg-red-50"
+        >
+          <ShieldAlert size={13} /> {retrying ? 'Retrying…' : 'Retry Blockchain Registration'}
+        </button>
       )}
     </div>
   );
@@ -148,8 +187,9 @@ export default function CertificateDetail() {
   }, [assignOpen, orgId]);
 
   useEffect(() => {
-    if (cert?.verificationUrl) {
-      QRCode.toDataURL(cert.verificationUrl, { width: 150, margin: 1 }).then(setQrSrc);
+    if (cert?.certificateId) {
+      const publicUrl = `${window.location.origin}/verify/${cert.certificateId}`;
+      QRCode.toDataURL(publicUrl, { width: 150, margin: 1 }).then(setQrSrc);
     }
   }, [cert]);
 
@@ -186,7 +226,12 @@ export default function CertificateDetail() {
   }
 
   function copyLink() {
-    if (cert?.verificationUrl) { navigator.clipboard.writeText(cert.verificationUrl); toast.success('Link copied!'); }
+    if (cert?.verificationUrl) {
+      // Always use the current window origin so stored URLs with wrong port/host still work
+      const publicUrl = `${window.location.origin}/verify/${cert.certificateId}`;
+      navigator.clipboard.writeText(publicUrl);
+      toast.success('Link copied!');
+    }
   }
 
   if (loading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
@@ -232,7 +277,7 @@ export default function CertificateDetail() {
         )}
       </div>
 
-      <BlockchainInfoPanel cert={cert} />
+      <BlockchainInfoPanel cert={cert} orgId={orgId} onRetrySuccess={updates => setCert(c => c ? { ...c, ...updates } : c)} />
 
       <div className="card mb-5">
         <div className="flex flex-col sm:flex-row gap-6 items-start">
@@ -251,7 +296,7 @@ export default function CertificateDetail() {
             <button onClick={copyLink} className="btn-secondary flex items-center gap-2 w-full justify-center">
               <Copy size={14} /> Copy Verification Link
             </button>
-            <a href={cert.verificationUrl} target="_blank" rel="noreferrer" className="btn-secondary flex items-center gap-2 w-full justify-center">
+            <a href={`${window.location.origin}/verify/${cert.certificateId}`} target="_blank" rel="noreferrer" className="btn-secondary flex items-center gap-2 w-full justify-center">
               <ExternalLink size={14} /> Open Public Page
             </a>
             {/* Revoke: admin/owner only */}

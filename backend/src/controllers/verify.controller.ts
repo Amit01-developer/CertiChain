@@ -104,6 +104,8 @@ export const verifyController = {
       }
     }
 
+    const currentVerificationUrl = `${env.FRONTEND_URL}/verify/${cert.certificateId}`;
+
     const base = {
       certificateId:   cert.certificateId,
       title:           cert.title,
@@ -112,7 +114,7 @@ export const verifyController = {
       issueDate:       cert.issueDate,
       expiryDate:      cert.expiryDate,
       status:          cert.status,
-      verificationUrl: cert.verificationUrl,
+      verificationUrl: currentVerificationUrl,
       pdfUrl:          cert.pdfUrl,
       qrCodeUrl:       cert.qrCodeUrl,
       blockchain:      blockchainVerification,

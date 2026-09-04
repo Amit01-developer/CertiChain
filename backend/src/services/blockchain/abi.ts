@@ -1,5 +1,19 @@
 export const REGISTRY_ABI = [
   {
+    inputs: [],
+    name: "owner",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "issuer", type: "address" }],
+    name: "authorizedIssuers",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [
       { internalType: "string", name: "certificateId", type: "string" },
       { internalType: "string", name: "certHashHex",   type: "string" },

@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import PublicLayout from './layouts/PublicLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import Spinner from './components/ui/Spinner';
-import { getDashboardRouteForRole } from './utils/dashboardRole';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
@@ -47,9 +46,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function DashboardHome() {
-  const { organization } = useAuth();
+  const { organization, loading } = useAuth();
   const role = organization?.role;
 
+  // Wait until auth is fully loaded before deciding which dashboard to show
+  if (loading) return <LoadingScreen />;
   if (role === 'STAFF') return <Navigate to="/dashboard/staff" replace />;
   return <Dashboard />;
 }
@@ -60,7 +61,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   if (!user) return <Navigate to="/login" replace />;
 
   const role = organization?.role;
-  if (role === 'STAFF') return <Navigate to={getDashboardRouteForRole(role)} replace />;
+  if (role === 'STAFF') return <Navigate to="/dashboard/staff" replace />;
   return <>{children}</>;
 }
 
@@ -88,8 +89,8 @@ function AppRoutes() {
           <Route path="certificates/bulk" element={<NewCertificate bulk />} />
           <Route path="certificates/:id" element={<CertificateDetail />} />
           <Route path="templates" element={<Templates />} />
-          <Route path="templates/new" element={<NewTemplate />} />
-          <Route path="templates/:id/edit" element={<EditTemplate />} />
+          <Route path="templates/new" element={<AdminRoute><NewTemplate /></AdminRoute>} />
+          <Route path="templates/:id/edit" element={<AdminRoute><EditTemplate /></AdminRoute>} />
           <Route path="recipients" element={<Recipients />} />
           <Route path="analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
           <Route path="audit-logs" element={<AdminRoute><AuditLogs /></AdminRoute>} />

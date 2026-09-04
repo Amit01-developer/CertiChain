@@ -311,6 +311,41 @@ export const certificateController = {
     return ok(res, { pdfUrl: cert.pdfUrl, filename: `Certificate-${cert.certificateId}.pdf` });
   },
 
+  async blockchainRetry(req: Request, res: Response) {
+    const orgId  = req.orgId!;
+    const certId = str(req.params.id);
+
+    const cert = await prisma.certificate.findFirst({
+      where: { id: certId, organizationId: orgId },
+    });
+    if (!cert) return notFound(res, 'Certificate not found.');
+
+    if (cert.blockchainStatus === 'CONFIRMED') {
+      return ok(res, { blockchainStatus: cert.blockchainStatus }, 'Already registered on blockchain.');
+    }
+
+    if (!blockchainService.isEnabled) {
+      return badRequest(res, 'Blockchain is not enabled. Set BLOCKCHAIN_ENABLED=true and configure RPC/key/contract.');
+    }
+
+    if (!cert.certificateHash) {
+      return badRequest(res, 'Certificate is missing its hash — cannot register on blockchain.');
+    }
+
+    // Reset to PENDING so the UI reflects the in-progress state
+    await prisma.certificate.update({
+      where: { id: certId },
+      data:  { blockchainStatus: 'PENDING' },
+    });
+
+    // Fire-and-forget — same pattern as initial issuance
+    registerOnBlockchain(cert.id, cert.certificateId, cert.certificateHash, orgId, req.user!.userId, req.ip)
+      .catch(() => {});
+
+    const updated = await prisma.certificate.findUnique({ where: { id: certId } });
+    return ok(res, updated, 'Blockchain registration queued.');
+  },
+
   async bulkCreate(req: Request, res: Response) {
     const orgId = req.orgId!;
     if (!req.file) return badRequest(res, 'CSV file is required.');

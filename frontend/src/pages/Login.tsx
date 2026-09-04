@@ -4,15 +4,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle, Eye, EyeOff, ShieldCheck, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getDashboardRouteForRole } from '../utils/dashboardRole';
 
 const schema = z.object({
   email:    z.string().email('Valid email required'),
   password: z.string().min(1, 'Password required'),
 });
 type Form = z.infer<typeof schema>;
+
+type RoleIntent = 'admin' | 'staff';
 
 function GoogleIcon() {
   return (
@@ -28,19 +29,30 @@ function GoogleIcon() {
 export default function Login() {
   const { login, loginWithFirebase } = useAuth();
   const navigate = useNavigate();
-  const [showPassword, setShowPassword]     = useState(false);
-  const [googleLoading, setGoogleLoading]   = useState(false);
+  const [roleIntent, setRoleIntent]             = useState<RoleIntent>('admin');
+  const [showPassword, setShowPassword]         = useState(false);
+  const [googleLoading, setGoogleLoading]       = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
   });
 
+  function redirectByRole(role?: string) {
+    const r = (role ?? '').toUpperCase();
+    if (r === 'STAFF') {
+      navigate('/dashboard/staff');
+    } else {
+      navigate('/dashboard');
+    }
+  }
+
   async function onSubmit(data: Form) {
     try {
       const result = await login(data.email, data.password);
-      const nextRoute = getDashboardRouteForRole(result?.organization?.role ?? undefined);
       toast.success('Welcome back!');
-      navigate(nextRoute);
+      // Use actual role from API response — roleIntent is just a UI hint
+      const actualRole = (result as any)?.organization?.role;
+      redirectByRole(actualRole ?? (roleIntent === 'staff' ? 'STAFF' : 'ADMIN'));
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Login failed.');
     }
@@ -50,9 +62,9 @@ export default function Login() {
     setGoogleLoading(true);
     try {
       const result = await loginWithFirebase();
-      const nextRoute = getDashboardRouteForRole(result?.organization?.role ?? undefined);
       toast.success('Welcome!');
-      navigate(nextRoute);
+      const actualRole = (result as any)?.organization?.role;
+      redirectByRole(actualRole ?? (roleIntent === 'staff' ? 'STAFF' : 'ADMIN'));
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Google sign-in failed.');
     } finally {
@@ -63,13 +75,51 @@ export default function Login() {
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-5 py-16">
       <div className="w-full max-w-md">
+
+        {/* Logo + title */}
         <div className="text-center mb-8">
           <CheckCircle size={32} className="text-brand-mid mx-auto mb-3" />
           <h1 className="font-serif text-3xl text-brand-dark">Welcome back</h1>
           <p className="text-gray-500 text-sm mt-2">Sign in to your CertiChain account</p>
         </div>
 
+        {/* Role toggle */}
+        <div className="flex rounded-lg border border-brand-border overflow-hidden mb-6 bg-white">
+          <button
+            type="button"
+            onClick={() => setRoleIntent('admin')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors ${
+              roleIntent === 'admin'
+                ? 'bg-brand-dark text-white'
+                : 'text-gray-500 hover:bg-brand-cream'
+            }`}
+          >
+            <ShieldCheck size={16} />
+            Admin / Owner
+          </button>
+          <button
+            type="button"
+            onClick={() => setRoleIntent('staff')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors ${
+              roleIntent === 'staff'
+                ? 'bg-brand-dark text-white'
+                : 'text-gray-500 hover:bg-brand-cream'
+            }`}
+          >
+            <Shield size={16} />
+            Staff Member
+          </button>
+        </div>
+
+        {/* Context hint */}
+        <p className="text-xs text-center text-gray-400 mb-6 -mt-3">
+          {roleIntent === 'admin'
+            ? 'You will be taken to the Admin Dashboard.'
+            : 'You will be taken to the Staff Dashboard.'}
+        </p>
+
         <div className="card">
+          {/* Google */}
           <button
             type="button"
             onClick={handleGoogleLogin}
@@ -86,6 +136,7 @@ export default function Login() {
             <hr className="flex-1 border-brand-border" />
           </div>
 
+          {/* Email / password form */}
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
             <div>
               <label className="label" htmlFor="email">Email address</label>
@@ -120,8 +171,14 @@ export default function Login() {
               </Link>
             </div>
 
-            <button type="submit" disabled={isSubmitting || googleLoading} className="btn-primary w-full py-3">
-              {isSubmitting ? 'Signing in…' : 'Sign In'}
+            <button
+              type="submit"
+              disabled={isSubmitting || googleLoading}
+              className="btn-primary w-full py-3"
+            >
+              {isSubmitting
+                ? 'Signing in…'
+                : `Sign in as ${roleIntent === 'admin' ? 'Admin' : 'Staff'}`}
             </button>
           </form>
 
