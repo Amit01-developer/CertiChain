@@ -144,6 +144,39 @@ export class EmailService {
   }
 
   /**
+   * Sent to a reviewer (staff or owner) when they are assigned to review a certificate.
+   */
+  reviewAssignedEmail(
+    reviewerName:  string,
+    reviewerEmail: string,
+    certTitle:     string,
+    recipientName: string,
+    orgName:       string,
+    reviewUrl:     string,
+  ): SendOptions {
+    return {
+      to:      reviewerEmail,
+      subject: `Action required: Review certificate "${certTitle}" — ${orgName}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <h2 style="color:#112a29;">Certificate Review Assigned</h2>
+          <p>Hi ${reviewerName},</p>
+          <p>You have been assigned to review the following certificate in <strong>${orgName}</strong>:</p>
+          <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Certificate</td><td style="padding:8px;border:1px solid #ddd;">${certTitle}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Recipient</td><td style="padding:8px;border:1px solid #ddd;">${recipientName}</td></tr>
+          </table>
+          <p>Please review and either <strong>Approve</strong> or <strong>Reject</strong> the certificate. It will only be issued once both the staff reviewer and the owner/admin have approved.</p>
+          <a href="${reviewUrl}" style="background:#112a29;color:#ddf05c;padding:12px 24px;text-decoration:none;border-radius:4px;display:inline-block;margin:16px 0;">
+            Review Certificate
+          </a>
+          <p style="color:#888;font-size:12px;">If you believe this was sent in error, contact your organization administrator.</p>
+        </div>
+      `,
+    };
+  }
+
+  /**
    * Sent to a new (unregistered) user who has been invited as staff.
    */
   staffInvitationEmail(email: string, orgName: string, inviteUrl: string): SendOptions {

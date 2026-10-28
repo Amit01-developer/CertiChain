@@ -95,10 +95,12 @@ export const organizationController = {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const sixMonthsAgo  = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
-    const [total, active, revoked, totalRecipients, thisMonth, verifications, rawCerts] = await Promise.all([
+    const [total, active, revoked, draft, rejected, totalRecipients, thisMonth, verifications, rawCerts] = await Promise.all([
       prisma.certificate.count({ where: { organizationId: orgId } }),
       prisma.certificate.count({ where: { organizationId: orgId, status: 'ACTIVE' } }),
       prisma.certificate.count({ where: { organizationId: orgId, status: 'REVOKED' } }),
+      prisma.certificate.count({ where: { organizationId: orgId, status: 'DRAFT' } }),
+      prisma.certificate.count({ where: { organizationId: orgId, status: 'REJECTED' } }),
       prisma.recipient.count({ where: { organizationId: orgId } }),
       prisma.certificate.count({
         where: { organizationId: orgId, createdAt: { gte: startOfMonth } },
@@ -121,7 +123,7 @@ export const organizationController = {
     const trend = Object.entries(trendMap).map(([month, count]) => ({ month, count }));
 
     return ok(res, {
-      total, active, revoked, totalRecipients, thisMonth, verifications,
+      total, active, revoked, draft, rejected, totalRecipients, thisMonth, verifications,
       trend,
     });
   },
@@ -149,45 +151,92 @@ export const organizationController = {
     const orgId  = req.orgId!;
     const userId = req.user!.userId;
 
-    const [org, recentCerts, pendingReviews, issuedByMeCount] = await Promise.all([
-      prisma.organization.findUnique({
-        where:  { id: orgId },
-        select: { id: true, name: true, type: true, logoUrl: true },
-      }),
-      prisma.certificate.findMany({
-        where:   { organizationId: orgId },
-        include: { recipient: { select: { name: true, email: true } } },
-        orderBy: { createdAt: 'desc' },
-        take:    10,
-      }),
-      prisma.certificateReview.findMany({
-        where: {
-          reviewerId:  userId,
-          decision:    'PENDING',
-          certificate: { organizationId: orgId },
-        },
-        include: {
-          certificate: {
-            include: { recipient: { select: { name: true, email: true } } },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.certificate.count({
-        where: { organizationId: orgId, issuedById: userId },
-      }),
-    ]);
-
     const member = await prisma.orgMember.findUnique({
       where: { organizationId_userId: { organizationId: orgId, userId } },
     });
 
+    const [org, pendingReviews, completedReviews, issuedByMeCount, draftCerts, recentActive] = await Promise.all([
+      prisma.organization.findUnique({
+        where:  { id: orgId },
+        select: { id: true, name: true, type: true, logoUrl: true },
+      }),
+
+      // Tasks assigned to ME that are still PENDING
+      prisma.certificateReview.findMany({
+        where: {
+          reviewerId: userId,
+          decision:   'PENDING',
+          certificate: { organizationId: orgId, status: 'DRAFT' },
+        },
+        include: {
+          certificate: {
+            include: {
+              recipient: { select: { name: true, email: true } },
+              reviews: {
+                include: { reviewer: { select: { id: true, name: true, role: true } } },
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+
+      // Tasks I've already decided on
+      prisma.certificateReview.findMany({
+        where: {
+          reviewerId: userId,
+          decision:   { in: ['APPROVED', 'REJECTED'] },
+          certificate: { organizationId: orgId },
+        },
+        include: {
+          certificate: { include: { recipient: { select: { name: true, email: true } } } },
+        },
+        orderBy: { decidedAt: 'desc' },
+        take: 20,
+      }),
+
+      // Certificates I created
+      prisma.certificate.count({ where: { organizationId: orgId, issuedById: userId } }),
+
+      // All DRAFT certs in the org (visible to owner/admin for oversight)
+      member?.role === 'OWNER' || member?.role === 'ADMIN'
+        ? prisma.certificate.findMany({
+            where:   { organizationId: orgId, status: 'DRAFT' },
+            include: {
+              recipient: { select: { name: true, email: true } },
+              reviews: {
+                include: { reviewer: { select: { id: true, name: true } } },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          })
+        : Promise.resolve([]),
+
+      // Recent ACTIVE certificates
+      prisma.certificate.findMany({
+        where:   { organizationId: orgId, status: 'ACTIVE' },
+        include: { recipient: { select: { name: true, email: true } } },
+        orderBy: { updatedAt: 'desc' },
+        take:    10,
+      }),
+    ]);
+
     return ok(res, {
-      organization:    org,
-      role:            member?.role ?? 'STAFF',
-      issuedByMe:      issuedByMeCount,
-      recentCerts,
-      pendingReviews,
+      organization:     org,
+      role:             member?.role ?? 'STAFF',
+      issuedByMe:       issuedByMeCount,
+      // Tasks assigned to the logged-in user
+      myPendingReviews: pendingReviews,
+      myReviewHistory:  completedReviews,
+      // Org-wide overview (only for OWNER/ADMIN)
+      draftCertificates: draftCerts,
+      recentActiveCertificates: recentActive,
+      stats: {
+        pendingReviewCount:   pendingReviews.length,
+        completedReviewCount: completedReviews.length,
+        draftCount:           draftCerts.length,
+      },
     });
   },
 };

@@ -23,7 +23,7 @@ export interface Organization {
 }
 
 export type OrgMemberRole = 'OWNER' | 'ADMIN' | 'STAFF';
-export type CertificateStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+export type CertificateStatus = 'DRAFT' | 'ACTIVE' | 'REVOKED' | 'EXPIRED' | 'REJECTED';
 
 export interface Recipient {
   id:    string;
@@ -151,6 +151,7 @@ export interface CertificateReview {
   id:            string;
   certificateId: string;
   reviewerId:    string;
+  reviewerRole:  OrgMemberRole;
   decision:      ReviewDecision;
   comment:       string | null;
   decidedAt:     string | null;
@@ -164,6 +165,7 @@ export interface CertificateReview {
   certificate?: Certificate & {
     recipient: { name: string; email: string };
     organization: { id: string; name: string };
+    reviews?: CertificateReview[];
   };
 }
 

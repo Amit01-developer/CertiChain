@@ -5,6 +5,102 @@ import { str } from '../utils/param';
 import {
   ok, created, badRequest, notFound, conflict, forbidden,
 } from '../utils/apiResponse';
+import { blockchainService } from '../services/blockchain';
+import { emailService } from '../services/email.service';
+import { logger } from '../utils/logger';
+import { env } from '../config/env';
+
+// ── helper: activate a certificate after all required reviews are approved ────
+async function tryActivateCertificate(certId: string, orgId: string, userId: string, ip?: string) {
+  const allReviews = await prisma.certificateReview.findMany({
+    where: { certificateId: certId },
+    select: { decision: true, reviewerRole: true },
+  });
+
+  // Need at least one APPROVED decision from a STAFF-role reviewer (or from an OWNER if no staff exist)
+  // AND at least one APPROVED decision from an OWNER/ADMIN-role reviewer.
+  // If there are NO staff reviewers assigned, owner approval alone is sufficient.
+  const staffReviews = allReviews.filter(r => r.reviewerRole === 'STAFF');
+  const ownerReviews = allReviews.filter(r => r.reviewerRole === 'OWNER' || r.reviewerRole === 'ADMIN');
+
+  // Check for any rejection — immediate REJECTED status
+  const anyRejected = allReviews.some(r => r.decision === 'REJECTED');
+  if (anyRejected) {
+    await prisma.certificate.update({
+      where: { id: certId },
+      data:  { status: 'REJECTED' },
+    });
+    await audit({
+      userId, organizationId: orgId,
+      action: 'CERTIFICATE_REJECTED', resourceType: 'Certificate', resourceId: certId,
+      ipAddress: ip,
+    });
+    return 'REJECTED';
+  }
+
+  const ownerApproved  = ownerReviews.some(r => r.decision === 'APPROVED');
+  const staffApproved  = staffReviews.length === 0
+    ? true  // no staff assigned → owner approval alone is sufficient
+    : staffReviews.some(r => r.decision === 'APPROVED');
+
+  if (!ownerApproved || !staffApproved) return 'PENDING'; // still waiting
+
+  // All conditions met → ACTIVATE
+  const cert = await prisma.certificate.update({
+    where:   { id: certId },
+    data:    { status: 'ACTIVE', blockchainStatus: blockchainService.isEnabled ? 'PENDING' : 'FAILED' },
+    include: { recipient: true, organization: true },
+  });
+
+  await audit({
+    userId, organizationId: orgId,
+    action: 'CERTIFICATE_ISSUED', resourceType: 'Certificate', resourceId: certId,
+    metadata: { certificateId: cert.certificateId },
+    ipAddress: ip,
+  });
+
+  // Register on blockchain (fire-and-forget)
+  if (blockchainService.isEnabled && cert.certificateHash) {
+    (async () => {
+      try {
+        const result = await blockchainService.registerCertificate(cert.certificateId, cert.certificateHash!);
+        await prisma.certificate.update({
+          where: { id: certId },
+          data:  {
+            blockchainTxHash:  result.success ? result.txHash  : undefined,
+            blockchainHash:    result.success ? cert.certificateHash : undefined,
+            blockchainStatus:  result.success ? 'CONFIRMED' : 'FAILED',
+            blockchainNetwork: result.success ? (result.network ?? 'Polygon Amoy') : undefined,
+          },
+        });
+        await audit({
+          userId, organizationId: orgId,
+          action:       result.success ? 'BLOCKCHAIN_REGISTERED' : 'BLOCKCHAIN_FAILED',
+          resourceType: 'Certificate', resourceId: certId,
+          metadata:     result.success ? { txHash: result.txHash } : { error: result.error },
+          ipAddress:    ip,
+        });
+      } catch (e: any) {
+        logger.error('[Blockchain] auto-activate registerOnBlockchain threw', { certId, error: e?.message });
+        await prisma.certificate.update({ where: { id: certId }, data: { blockchainStatus: 'FAILED' } }).catch(() => {});
+      }
+    })();
+  }
+
+  // Send certificate email to recipient (fire-and-forget)
+  emailService.send(
+    emailService.certificateIssuedEmail(
+      cert.recipient.name,
+      cert.recipient.email,
+      cert.certificateId,
+      cert.title,
+      (cert as any).organization?.name ?? 'CertiChain',
+      cert.verificationUrl,
+    )
+  ).catch((e: any) => logger.warn('Certificate activation email failed', { certId, error: e?.message }));
+
+  return 'ACTIVATED';
+}
 
 export const reviewController = {
 
@@ -46,7 +142,7 @@ export const reviewController = {
         prisma.certificateReview.upsert({
           where:  { certificateId_reviewerId: { certificateId: certId, reviewerId } },
           update: {},   // keep existing decision if already assigned
-          create: { certificateId: certId, reviewerId, decision: 'PENDING' },
+          create: { certificateId: certId, reviewerId, reviewerRole: 'STAFF', decision: 'PENDING' },
         })
       )
     );
@@ -87,12 +183,15 @@ export const reviewController = {
       rejected: reviews.filter(r => r.decision === 'REJECTED').length,
     };
 
-    return ok(res, { reviews, summary });
+    return ok(res, { reviews, summary, certificateStatus: cert.status });
   },
 
   /** POST /api/organizations/:orgId/certificates/:certId/reviews/decide
-   *  Staff reviewer submits their decision (APPROVED or REJECTED).
+   *  Staff or Owner/Admin reviewer submits their decision (APPROVED or REJECTED).
    *  Body: { decision: 'APPROVED' | 'REJECTED', comment?: string }
+   *
+   *  After every decision, checks if ALL required slots are approved → auto-activates.
+   *  If anyone rejects → certificate is immediately REJECTED.
    */
   async submitDecision(req: Request, res: Response) {
     const orgId   = req.orgId!;
@@ -105,6 +204,13 @@ export const reviewController = {
 
     const cert = await prisma.certificate.findFirst({ where: { id: certId, organizationId: orgId } });
     if (!cert) return notFound(res, 'Certificate not found.');
+
+    if (cert.status === 'ACTIVE') {
+      return conflict(res, 'This certificate is already active and has been issued.');
+    }
+    if (cert.status === 'REJECTED') {
+      return conflict(res, 'This certificate has already been rejected.');
+    }
 
     const reviewerId = req.user!.userId;
 
@@ -120,7 +226,7 @@ export const reviewController = {
       return conflict(res, `You have already submitted a ${review.decision} decision for this certificate.`);
     }
 
-    const updated = await prisma.certificateReview.update({
+    await prisma.certificateReview.update({
       where: { certificateId_reviewerId: { certificateId: certId, reviewerId } },
       data:  { decision, comment: comment ?? null, decidedAt: new Date() },
     });
@@ -129,15 +235,31 @@ export const reviewController = {
       userId: reviewerId, organizationId: orgId,
       action: decision === 'APPROVED' ? 'REVIEW_APPROVED' : 'REVIEW_REJECTED',
       resourceType: 'Certificate', resourceId: certId,
-      metadata: { decision, comment },
+      metadata: { decision, comment, reviewerRole: review.reviewerRole },
       ipAddress: req.ip,
     });
 
-    return ok(res, updated, `Decision recorded: ${decision}.`);
+    // Check if certificate should be activated or rejected
+    const activationResult = await tryActivateCertificate(certId, orgId, reviewerId, req.ip);
+
+    let message = `Decision recorded: ${decision}.`;
+    if (activationResult === 'ACTIVATED') {
+      message = `Decision recorded: ${decision}. All reviews complete — certificate is now ACTIVE and has been sent to the recipient.`;
+    } else if (activationResult === 'REJECTED') {
+      message = `Decision recorded: ${decision}. Certificate has been REJECTED.`;
+    } else {
+      message = `Decision recorded: ${decision}. Waiting for remaining reviewers to approve.`;
+    }
+
+    const updatedReview = await prisma.certificateReview.findUnique({
+      where: { certificateId_reviewerId: { certificateId: certId, reviewerId } },
+    });
+
+    return ok(res, { review: updatedReview, certificateOutcome: activationResult }, message);
   },
 
   /** GET /api/organizations/:orgId/reviews/pending
-   *  Staff: list all certificates where this user has a PENDING review task.
+   *  Staff/Owner: list all certificates where this user has a PENDING review task.
    */
   async myPendingReviews(req: Request, res: Response) {
     const orgId      = req.orgId!;
@@ -147,13 +269,17 @@ export const reviewController = {
       where: {
         reviewerId,
         decision: 'PENDING',
-        certificate: { organizationId: orgId },
+        certificate: { organizationId: orgId, status: 'DRAFT' },
       },
       include: {
         certificate: {
           include: {
-            recipient: { select: { name: true, email: true } },
+            recipient:    { select: { name: true, email: true } },
             organization: { select: { id: true, name: true } },
+            reviews: {
+              include: { reviewer: { select: { id: true, name: true } } },
+              orderBy: { createdAt: 'asc' },
+            },
           },
         },
       },

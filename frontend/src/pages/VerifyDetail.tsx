@@ -229,7 +229,28 @@ export default function VerifyDetail() {
           <div className="flex-1 space-y-3">
             <p className="overline">Actions</p>
             {d.pdfUrl && (
-              <a href={d.pdfUrl} target="_blank" rel="noreferrer" className="btn-secondary flex items-center gap-2 w-full justify-center">
+              <a
+                href={d.pdfUrl}
+                download={`Certificate-${d.certificateId}.pdf`}
+                onClick={async (e) => {
+                  // Force download even for cross-origin URLs (Cloudinary/S3)
+                  e.preventDefault();
+                  try {
+                    const resp = await fetch(d.pdfUrl!);
+                    const blob = await resp.blob();
+                    const url  = URL.createObjectURL(blob);
+                    const a    = document.createElement('a');
+                    a.href     = url;
+                    a.download = `Certificate-${d.certificateId}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    // Fallback: open in new tab
+                    window.open(d.pdfUrl!, '_blank');
+                  }
+                }}
+                className="btn-secondary flex items-center gap-2 w-full justify-center"
+              >
                 <Download size={15} /> Download Certificate PDF
               </a>
             )}

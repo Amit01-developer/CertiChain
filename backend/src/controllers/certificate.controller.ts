@@ -77,45 +77,59 @@ async function registerOnBlockchain(
 ): Promise<void> {
   if (!blockchainService.isEnabled) return;
 
-  const result = await blockchainService.registerCertificate(certId, certHash);
+  try {
+    const result = await blockchainService.registerCertificate(certId, certHash);
 
-  if (result.success) {
-    await prisma.certificate.update({
-      where: { id: certDbId },
-      data: {
-        blockchainTxHash:  result.txHash,
-        blockchainHash:    certHash,
-        blockchainStatus:  'CONFIRMED',
-        blockchainNetwork: result.network ?? 'Polygon Amoy',
-      },
-    });
+    if (result.success) {
+      await prisma.certificate.update({
+        where: { id: certDbId },
+        data: {
+          blockchainTxHash:  result.txHash,
+          blockchainHash:    certHash,
+          blockchainStatus:  'CONFIRMED',
+          blockchainNetwork: result.network ?? 'Polygon Amoy',
+        },
+      });
 
-    await audit({
-      userId, organizationId: orgId,
-      action:       'BLOCKCHAIN_REGISTERED',
-      resourceType: 'Certificate',
-      resourceId:   certDbId,
-      metadata:     { txHash: result.txHash, certHash, certId },
-      ipAddress,
+      await audit({
+        userId, organizationId: orgId,
+        action:       'BLOCKCHAIN_REGISTERED',
+        resourceType: 'Certificate',
+        resourceId:   certDbId,
+        metadata:     { txHash: result.txHash, certHash, certId },
+        ipAddress,
+      });
+    } else {
+      await prisma.certificate.update({
+        where: { id: certDbId },
+        data:  { blockchainStatus: 'FAILED' },
+      });
+
+      await audit({
+        userId, organizationId: orgId,
+        action:       'BLOCKCHAIN_FAILED',
+        resourceType: 'Certificate',
+        resourceId:   certDbId,
+        metadata:     { error: result.error, certId },
+        ipAddress,
+      });
+
+      logger.warn('[Blockchain] Registration failed — certificate saved to DB normally', {
+        certId, error: result.error,
+      });
+    }
+  } catch (unexpectedErr: any) {
+    // Safety net: any unexpected throw (network crash, DB error, etc.) must
+    // still flip the status away from PENDING so it doesn't get stuck.
+    logger.error('[Blockchain] Unexpected error in registerOnBlockchain — marking FAILED', {
+      certId, certDbId, error: unexpectedErr?.message,
     });
-  } else {
     await prisma.certificate.update({
       where: { id: certDbId },
       data:  { blockchainStatus: 'FAILED' },
-    });
-
-    await audit({
-      userId, organizationId: orgId,
-      action:       'BLOCKCHAIN_FAILED',
-      resourceType: 'Certificate',
-      resourceId:   certDbId,
-      metadata:     { error: result.error, certId },
-      ipAddress,
-    });
-
-    logger.warn('[Blockchain] Registration failed — certificate saved to DB normally', {
-      certId, error: result.error,
-    });
+    }).catch((dbErr: any) =>
+      logger.error('[Blockchain] Could not update blockchainStatus to FAILED', { certDbId, error: dbErr?.message })
+    );
   }
 }
 
@@ -139,7 +153,13 @@ export const certificateController = {
     const [certificates, total] = await Promise.all([
       prisma.certificate.findMany({
         where,
-        include: { recipient: true, template: { select: { id: true, name: true } } },
+        include: {
+          recipient: true,
+          template: { select: { id: true, name: true } },
+          reviews: {
+            select: { reviewerId: true, reviewerRole: true, decision: true },
+          },
+        },
         orderBy: { createdAt: 'desc' },
         skip:    (page - 1) * limit,
         take:    limit,
@@ -187,6 +207,22 @@ export const certificateController = {
 
     const { certId, verificationUrl, pdfUrl, qrUrl, certHash } = buildResult;
 
+    // ── Dual-verification flow ────────────────────────────────────────────────
+    // Certificate starts as DRAFT. It becomes ACTIVE only after BOTH a
+    // staff reviewer AND an owner/admin reviewer approve it.
+    // Find the org owner(s) / admins to auto-assign as owner-slot reviewer.
+    const ownerMembers = await prisma.orgMember.findMany({
+      where:  { organizationId: orgId, role: { in: ['OWNER', 'ADMIN'] } },
+      select: { userId: true, role: true },
+    });
+
+    // Staff members (excluding the creator if they are staff, to avoid self-review)
+    // We pick all STAFF members — the creator can still be a reviewer if they are STAFF
+    const staffMembers = await prisma.orgMember.findMany({
+      where:  { organizationId: orgId, role: 'STAFF' },
+      select: { userId: true },
+    });
+
     const cert = await prisma.certificate.create({
       data: {
         certificateId:   certId,
@@ -196,40 +232,80 @@ export const certificateController = {
         title, description, achievement, customMessage,
         issueDate:       new Date(issueDate),
         expiryDate:      expiryDate ? new Date(expiryDate) : null,
-        status:          'ACTIVE',
+        status:          'DRAFT',
         pdfUrl,
         qrCodeUrl:       qrUrl,
         verificationUrl,
         certificateHash: certHash,
         issuedById:      req.user!.userId,
-        blockchainStatus: blockchainService.isEnabled ? 'PENDING' : 'FAILED',
+        blockchainStatus: 'FAILED', // will be set to PENDING after approval
       },
       include: { recipient: true },
     });
 
+    // Auto-assign owner/admin slot reviewer (first owner, or the creator if they are owner)
+    const ownerReviewerUserId = ownerMembers.find(m => m.role === 'OWNER')?.userId
+      ?? ownerMembers[0]?.userId ?? null;
+
+    const reviewCreates: Array<{ certificateId: string; reviewerId: string; reviewerRole: any; decision: any }> = [];
+
+    if (ownerReviewerUserId) {
+      reviewCreates.push({
+        certificateId: cert.id,
+        reviewerId:    ownerReviewerUserId,
+        reviewerRole:  'OWNER',
+        decision:      'PENDING',
+      });
+    }
+
+    // Auto-assign all staff members as staff-slot reviewers (org may have multiple staff)
+    for (const sm of staffMembers) {
+      // Avoid duplicating if owner/admin is also assigned above
+      if (sm.userId !== ownerReviewerUserId) {
+        reviewCreates.push({
+          certificateId: cert.id,
+          reviewerId:    sm.userId,
+          reviewerRole:  'STAFF',
+          decision:      'PENDING',
+        });
+      }
+    }
+
+    // If no staff exist, the owner alone can approve (single-approver mode)
+    if (reviewCreates.length > 0) {
+      await prisma.certificateReview.createMany({ data: reviewCreates, skipDuplicates: true });
+    }
+
     await audit({
       userId: req.user!.userId, organizationId: orgId,
-      action: 'CERTIFICATE_ISSUED', resourceType: 'Certificate', resourceId: cert.id,
-      metadata: { certificateId: certId, recipientEmail },
+      action: 'CERTIFICATE_CREATED_DRAFT', resourceType: 'Certificate', resourceId: cert.id,
+      metadata: { certificateId: certId, recipientEmail, reviewerCount: reviewCreates.length },
       ipAddress: req.ip,
     });
 
-    registerOnBlockchain(cert.id, certId, certHash, orgId, req.user!.userId, req.ip).catch(() => {});
+    // Fire-and-forget review assignment emails
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    const reviewDashboardUrl = `${env.FRONTEND_URL}/dashboard`;
 
-    // Fire-and-forget email — never block the response on SMTP
-    if (sendEmail) {
-      prisma.organization.findUnique({ where: { id: orgId } })
-        .then(org => emailService.send(
-          emailService.certificateIssuedEmail(
-            recipientName, recipientEmail, certId, title, org?.name ?? 'CertiChain', verificationUrl
+    for (const rv of reviewCreates) {
+      const reviewer = await prisma.user.findUnique({ where: { id: rv.reviewerId }, select: { name: true, email: true } });
+      if (reviewer) {
+        emailService.send(
+          emailService.reviewAssignedEmail(
+            reviewer.name, reviewer.email,
+            title, recipientName,
+            org?.name ?? 'CertiChain',
+            reviewDashboardUrl,
           )
-        ))
-        .catch((emailErr: any) => logger.warn('Certificate email failed', {
-          certId, recipientEmail, error: emailErr?.message,
-        }));
+        ).catch(() => {});
+      }
     }
 
-    return created(res, cert, `Certificate ${certId} issued successfully.`);
+    return created(res, {
+      ...cert,
+      reviewStatus: 'PENDING_REVIEW',
+      message: 'Certificate created in DRAFT. It will be activated once all reviewers approve.',
+    }, `Certificate ${certId} created. Awaiting review and approval.`);
     } catch (err: any) {
       logger.error('Certificate create error', { error: err?.message, stack: err?.stack });
       return serverError(res, err?.message || 'Failed to issue certificate.');
@@ -241,7 +317,15 @@ export const certificateController = {
     const id    = str(req.params.id);
     const cert  = await prisma.certificate.findFirst({
       where:   { id, organizationId: orgId },
-      include: { recipient: true, template: true, revocation: true },
+      include: {
+        recipient: true,
+        template: true,
+        revocation: true,
+        reviews: {
+          include: { reviewer: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
     if (!cert) return notFound(res, 'Certificate not found.');
     return ok(res, cert);
@@ -255,6 +339,7 @@ export const certificateController = {
     const cert = await prisma.certificate.findFirst({ where: { id: certId, organizationId: orgId } });
     if (!cert) return notFound(res, 'Certificate not found.');
     if (cert.status === 'REVOKED') return conflict(res, 'Certificate is already revoked.');
+    if (cert.status === 'DRAFT') return badRequest(res, 'Cannot revoke a certificate that is still in DRAFT (pending review). Reject it through the review process instead.');
 
     await prisma.$transaction([
       prisma.certificate.update({
@@ -412,7 +497,9 @@ export const certificateController = {
           },
         });
 
-        registerOnBlockchain(cert.id, certId, certHash, orgId, req.user!.userId, req.ip).catch(() => {});
+        registerOnBlockchain(cert.id, certId, certHash, orgId, req.user!.userId, req.ip).catch((err: any) => {
+          logger.error('[Blockchain] bulk fire-and-forget registerOnBlockchain threw', { certId, error: err?.message });
+        });
 
         results.push({ certificateId: certId, name: row.name, email: row.email });
       } catch (err: any) {

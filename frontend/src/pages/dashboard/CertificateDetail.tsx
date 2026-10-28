@@ -289,7 +289,26 @@ export default function CertificateDetail() {
           )}
           <div className="flex-1 space-y-3">
             {cert.pdfUrl && (
-              <a href={cert.pdfUrl} target="_blank" rel="noreferrer" className="btn-secondary flex items-center gap-2 w-full justify-center">
+              <a
+                href={cert.pdfUrl}
+                download={`Certificate-${cert.certificateId}.pdf`}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  try {
+                    const resp = await fetch(cert.pdfUrl!);
+                    const blob = await resp.blob();
+                    const url  = URL.createObjectURL(blob);
+                    const a    = document.createElement('a');
+                    a.href     = url;
+                    a.download = `Certificate-${cert.certificateId}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    window.open(cert.pdfUrl!, '_blank');
+                  }
+                }}
+                className="btn-secondary flex items-center gap-2 w-full justify-center"
+              >
                 <Download size={14} /> Download PDF
               </a>
             )}

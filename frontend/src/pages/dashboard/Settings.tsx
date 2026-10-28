@@ -40,12 +40,18 @@ export default function Settings() {
   const memberForm = useForm<MemberForm>({ resolver: zodResolver(memberSchema), defaultValues: { role: 'STAFF' } });
   async function onAddMember(data: MemberForm) {
     try {
-      await api.post(`/organizations/${orgId}/members`, data);
-      toast.success('Member added.');
+      // Use /invitations so new users get an invite email, existing users are added directly
+      const res = await api.post(`/organizations/${orgId}/invitations`, { email: data.email });
+      const type = res.data.data?.type;
+      if (type === 'invited') {
+        toast.success(`Invitation email sent to ${data.email}.`);
+      } else {
+        toast.success(`${data.email} added as Staff member.`);
+      }
       setAddOpen(false);
       memberForm.reset();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to add member.');
+      toast.error(err.response?.data?.message || 'Failed to send invitation.');
     }
   }
 
@@ -97,7 +103,7 @@ export default function Settings() {
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-serif text-xl text-brand-dark">Organization Members</h2>
           <button onClick={() => setAddOpen(true)} className="btn-primary flex items-center gap-2 text-sm py-2">
-            <UserPlus size={14} /> Add Member
+            <UserPlus size={14} /> Invite Member
           </button>
         </div>
 
@@ -129,25 +135,21 @@ export default function Settings() {
         )}
       </div>
 
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Member">
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Invite Staff Member">
         <form onSubmit={memberForm.handleSubmit(onAddMember)} className="space-y-4">
           <div>
             <label className="label">Email address</label>
-            <input type="email" className="input" {...memberForm.register('email')} />
+            <input type="email" className="input" placeholder="staff@example.com" {...memberForm.register('email')} />
             {memberForm.formState.errors.email && (
               <p className="text-red-600 text-xs mt-1">{memberForm.formState.errors.email.message}</p>
             )}
-          </div>
-          <div>
-            <label className="label">Role</label>
-            <select className="input" {...memberForm.register('role')}>
-              <option value="STAFF">Staff</option>
-              <option value="ADMIN">Admin</option>
-            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              If the user is new, they will receive an invitation email. If they already have an account, they will be added directly.
+            </p>
           </div>
           <div className="flex gap-3">
             <button type="submit" disabled={memberForm.formState.isSubmitting} className="btn-primary flex-1 py-2.5">
-              {memberForm.formState.isSubmitting ? 'Adding…' : 'Add Member'}
+              {memberForm.formState.isSubmitting ? 'Sending…' : 'Send Invitation'}
             </button>
             <button type="button" onClick={() => setAddOpen(false)} className="btn-secondary px-5">Cancel</button>
           </div>

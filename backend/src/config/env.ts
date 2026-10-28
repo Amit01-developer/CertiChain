@@ -75,8 +75,8 @@ export const env = {
 
   BLOCKCHAIN_ENABLED:          optional('BLOCKCHAIN_ENABLED', 'false') === 'true',
   BLOCKCHAIN_RPC_URL:          optional('BLOCKCHAIN_RPC_URL', 'https://rpc-amoy.polygon.technology'),
-  BLOCKCHAIN_PRIVATE_KEY:      optional('BLOCKCHAIN_PRIVATE_KEY'),
-  BLOCKCHAIN_CONTRACT_ADDRESS: optional('BLOCKCHAIN_CONTRACT_ADDRESS'),
+  BLOCKCHAIN_PRIVATE_KEY:      sanitizeCredential(optional('BLOCKCHAIN_PRIVATE_KEY')),
+  BLOCKCHAIN_CONTRACT_ADDRESS: optional('BLOCKCHAIN_CONTRACT_ADDRESS').trim(),
   BLOCKCHAIN_CHAIN_ID:         parseInt(optional('BLOCKCHAIN_CHAIN_ID', '80002'), 10),
   BLOCKCHAIN_EXPLORER_URL:     optional('BLOCKCHAIN_EXPLORER_URL', 'https://amoy.polygonscan.com'),
 

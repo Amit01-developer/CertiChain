@@ -67,21 +67,33 @@ class BlockchainService {
       );
     }
 
-    // Authorization check is best-effort — if the contract doesn't expose
-    // owner()/authorizedIssuers() or the call reverts, we let the tx attempt
-    // proceed and surface any real auth failure from the transaction itself.
+    // Authorization check — if the wallet is clearly not authorized, fail fast
+    // rather than wasting a transaction that will revert on-chain.
     try {
       const owner = await (this.contract as any).owner?.().catch(() => null);
-      const isAuthorized = await (this.contract as any).authorizedIssuers?.(this.signer.address).catch(() => true);
+      const isAuthorized = await (this.contract as any).authorizedIssuers?.(this.signer.address).catch(() => null);
 
-      if (owner && owner.toLowerCase() !== this.signer.address.toLowerCase() && !isAuthorized) {
-        logger.warn(
-          `[Blockchain] Wallet ${this.signer.address} may not be authorized — attempting registration anyway.`
+      // isAuthorized===null means the contract doesn't expose that function; skip check.
+      if (isAuthorized === false) {
+        throw new Error(
+          `Wallet ${this.signer.address} is not authorized to register certificates on this contract. ` +
+          `Add this wallet as an authorized issuer on the smart contract, or update BLOCKCHAIN_PRIVATE_KEY.`
         );
       }
-    } catch {
-      // Authorization check failed; proceed and let the transaction surface the real error.
-      logger.warn('[Blockchain] Could not verify wallet authorization — proceeding with registration attempt.');
+
+      if (owner && isAuthorized === null &&
+          owner.toLowerCase() !== this.signer.address.toLowerCase()) {
+        // Contract has owner() but no authorizedIssuers(); warn and let the tx surface the error.
+        logger.warn(
+          `[Blockchain] Wallet ${this.signer.address} is not the contract owner — attempting registration anyway.`
+        );
+      }
+    } catch (authErr: any) {
+      // Re-throw explicit authorization errors; swallow RPC/ABI errors.
+      if (authErr.message?.includes('not authorized')) throw authErr;
+      logger.warn('[Blockchain] Could not verify wallet authorization — proceeding with registration attempt.', {
+        error: authErr?.message,
+      });
     }
   }
 

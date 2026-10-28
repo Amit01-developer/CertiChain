@@ -20,9 +20,11 @@ enum OrgMemberRole {
 }
 
 enum CertificateStatus {
+  DRAFT
   ACTIVE
   REVOKED
   EXPIRED
+  REJECTED
 }
 
 enum BlockchainStatus {
@@ -239,6 +241,7 @@ model CertificateReview {
   id            String         @id @default(uuid())
   certificateId String
   reviewerId    String
+  reviewerRole  OrgMemberRole  @default(STAFF)   // which role slot this review fills
   decision      ReviewDecision @default(PENDING)
   comment       String?
   decidedAt     DateTime?
